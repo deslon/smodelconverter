@@ -3,6 +3,7 @@
 Supernova model asset converter
 
 ## Building
-
-cmake CMakeLists.txt
-make
+```
+$ cmake CMakeLists.txt
+$ make
+```
