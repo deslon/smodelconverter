@@ -37,6 +37,11 @@ struct MeshNode {
 std::string directory;
 std::vector<MeshNode> meshNodes;
 
+void writeMeshVerticesVector(std::ostream& os, const std::vector<MeshVertex> &vec);
+void writeMeshNodesVector(std::ostream& os, const std::vector<MeshNode> &vec);
+void readMeshVerticesVector(std::istream& is, std::vector<MeshVertex> &vec);
+void readMeshNodesVector(std::istream& is, std::vector<MeshNode> &vec);
+
 void processNode(aiNode *node, const aiScene *scene);
 MeshNode processMesh(aiMesh *mesh, const aiScene *scene);
 
@@ -60,35 +65,73 @@ int main (int argc, char *argv[]){
 
     processNode(scene->mRootNode, scene);
 
-    typename std::vector<MeshNode>::size_type size = meshNodes.size();
+    int version = 5;
 
-    std::ofstream ofile;
-    ofile.open("test.txt", std::ios::out | std::ios::binary);
-    ofile.write((char*)&size, sizeof(size));
-    ofile.write((char*)&meshNodes.front(), sizeof(MeshNode) * meshNodes.size());
-    ofile.close();
+    std::ofstream os;
+    os.open("test.smodel", std::ios::out | std::ios::binary);
+    os.write("SMODEL", sizeof(char) * 6);
+    os.write((char*)&version, sizeof(int));
+    writeMeshNodesVector(os, meshNodes);
+    os.close();
 
-
+    char* readsig= new char[6];
+    int readversion;
     std::vector<MeshNode> meshNodesTest;
-    typename std::vector<MeshNode>::size_type size2 = 0;
 
-    std::ifstream ifile;
-    ifile.open("test.txt", std::ios::in | std::ios::binary);
-    ifile.read((char*)&size2, sizeof(size2));
-    meshNodesTest.resize(size2);
-    ifile.read((char*)&meshNodesTest.front(), sizeof(MeshNode) * meshNodes.size());
-    ifile.close();
+    std::ifstream is;
+    is.open("test.smodel", std::ios::in | std::ios::binary);
+    is.read(readsig, sizeof(char) * 6);
+    is.read((char*)&readversion, sizeof(int));
+    readMeshNodesVector(is, meshNodesTest);
+    is.close();
 
 
     for (int i = 0; i < meshNodes.size(); i++){
+        printf("Vertex count: %i\n", (int)meshNodes[i].meshVertices.size());
         printf("Vertex: x: %f, y: %f, z: %f\n", meshNodes[i].meshVertices[0].vertex.x, meshNodes[i].meshVertices[0].vertex.y, meshNodes[i].meshVertices[0].vertex.z);
     }
-/*
+
+    printf("Signature: %s\n", readsig);
+    printf("Version: %i\n", readversion);
     for (int i = 0; i < meshNodesTest.size(); i++){
+        
+        printf("Vertex2 count: %i\n", (int)meshNodesTest[i].meshVertices.size());
         printf("Vertex2: x: %f, y: %f, z: %f\n", meshNodesTest[i].meshVertices[0].vertex.x, meshNodesTest[i].meshVertices[0].vertex.y, meshNodesTest[i].meshVertices[0].vertex.z);
     }
-*/
+
   return 0;
+}
+
+void writeMeshVerticesVector(std::ostream& os, const std::vector<MeshVertex> &vec){
+    typename std::vector<MeshVertex>::size_type size = vec.size();
+    os.write((char*)&size, sizeof(size));
+    os.write((char*)&vec[0], vec.size() * sizeof(MeshVertex));
+}
+
+void writeMeshNodesVector(std::ostream& os, const std::vector<MeshNode> &vec){
+    typename std::vector<MeshNode>::size_type size = vec.size();
+    os.write((char*)&size, sizeof(size));
+
+    for (typename std::vector<MeshNode>::size_type i = 0; i < size; ++i){
+        writeMeshVerticesVector(os, vec[i].meshVertices);
+    }
+}
+
+void readMeshVerticesVector(std::istream& is, std::vector<MeshVertex> &vec){
+    typename std::vector<MeshVertex>::size_type size = 0;
+    is.read((char*)&size, sizeof(size));
+    vec.resize(size);
+    is.read((char*)&vec[0], vec.size() * sizeof(MeshVertex));
+}
+
+void readMeshNodesVector(std::istream& is, std::vector<MeshNode> &vec){
+    typename std::vector<MeshVertex>::size_type size = 0;
+    is.read((char*)&size, sizeof(size));
+    vec.resize(size);
+
+    for (typename std::vector<MeshNode>::size_type i = 0; i < size; ++i){
+        readMeshVerticesVector(is, vec[i].meshVertices);
+    }
 }
 
 void processNode(aiNode *node, const aiScene *scene){
