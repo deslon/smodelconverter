@@ -35,6 +35,7 @@ struct MeshMaterial {
 };
 
 struct MeshNode {
+    std::string name;
     std::vector<MeshVertex> meshVertices;
     std::vector<unsigned int> indices;
     std::vector<MeshMaterial> materials;
@@ -57,14 +58,14 @@ void readMeshMaterialsVector(std::istream& is, std::vector<MeshMaterial> &vec);
 void readMeshNodesVector(std::istream& is, std::vector<MeshNode> &vec);
 
 void processNode(aiNode *node, const aiScene *scene);
-MeshNode processMesh(aiMesh *mesh, const aiScene *scene);
+MeshNode processMesh(aiMesh *mesh, const aiScene *scene, const aiString& name);
 std::vector<MeshMaterial> loadMaterialTextures(aiMaterial *mat, aiTextureType assimp_type, int type);
 
 MeshData meshdata;
 
 int main (int argc, char *argv[]){
     if (argc < 2){
-        fprintf(stdout,"Usage: %s <input file> <output file> [options]\n",argv[0]);
+        fprintf(stdout,"Usage: %s <input file> [output file] [options]\n",argv[0]);
         return 1;
     }
 
@@ -102,27 +103,37 @@ int main (int argc, char *argv[]){
     readMeshNodesVector(is, meshDataTest.meshNodes);
     is.close();
 
+    printf("\n-----------Model summary---------------\n\n");
 
     printf("Nodes count: %i\n", (int)meshdata.meshNodes.size());
     for (int i = 0; i < meshdata.meshNodes.size(); i++){
+        printf("+++++++++\n");
+        printf("Node num: %s\n", meshdata.meshNodes[i].name.c_str());
         printf("Vertex count: %i\n", (int)meshdata.meshNodes[i].meshVertices.size());
-        printf("Vertex: x: %f, y: %f, z: %f\n", meshdata.meshNodes[i].meshVertices[0].vertex.x, meshdata.meshNodes[i].meshVertices[0].vertex.y, meshdata.meshNodes[i].meshVertices[0].vertex.z);
+        if ( meshdata.meshNodes[i].meshVertices.size() > 0)
+            printf("First vertex: x: %f, y: %f, z: %f\n", meshdata.meshNodes[i].meshVertices[0].vertex.x, meshdata.meshNodes[i].meshVertices[0].vertex.y, meshdata.meshNodes[i].meshVertices[0].vertex.z);
         printf("Index count: %i\n", (int)meshdata.meshNodes[i].indices.size());
-        printf("Texture: %s\n", meshdata.meshNodes[i].materials[0].texture.c_str());
+        if ( meshdata.meshNodes[i].materials.size() > 0)
+            printf("Texture: %s\n", meshdata.meshNodes[i].materials[0].texture.c_str());
     }
+    printf("+++++++++\n");
 
-    printf("--------------------------\n");
-
+    printf("\n\n-----------Read test---------------\n\n");
     printf("Signature: %s\n", readsig);
     printf("Version: %i\n", readversion);
 
     printf("Nodes count: %i\n", (int)meshDataTest.meshNodes.size());
     for (int i = 0; i < meshDataTest.meshNodes.size(); i++){
+        printf("+++++++++\n");
+        printf("Node num: %s\n", meshDataTest.meshNodes[i].name.c_str());
         printf("Vertex count: %i\n", (int)meshDataTest.meshNodes[i].meshVertices.size());
-        printf("Vertex: x: %f, y: %f, z: %f\n", meshDataTest.meshNodes[i].meshVertices[0].vertex.x, meshDataTest.meshNodes[i].meshVertices[0].vertex.y, meshDataTest.meshNodes[i].meshVertices[0].vertex.z);
+        if ( meshDataTest.meshNodes[i].meshVertices.size() > 0)
+            printf("First vertex: x: %f, y: %f, z: %f\n", meshDataTest.meshNodes[i].meshVertices[0].vertex.x, meshDataTest.meshNodes[i].meshVertices[0].vertex.y, meshDataTest.meshNodes[i].meshVertices[0].vertex.z);
         printf("Index count: %i\n", (int)meshDataTest.meshNodes[i].indices.size());
-        printf("Texture: %s\n", meshDataTest.meshNodes[i].materials[0].texture.c_str());
+        if ( meshDataTest.meshNodes[i].materials.size() > 0)
+            printf("Texture: %s\n", meshDataTest.meshNodes[i].materials[0].texture.c_str());
     }
+    printf("+++++++++\n");
 
   return 0;
 }
@@ -160,6 +171,7 @@ void writeMeshNodesVector(std::ostream& os, const std::vector<MeshNode> &vec){
     os.write((char*)&size, sizeof(size));
 
     for (typename std::vector<MeshNode>::size_type i = 0; i < size; ++i){
+        writeString(os, vec[i].name);
         writeMeshVerticesVector(os, vec[i].meshVertices);
         writeIndicesVector(os, vec[i].indices);
         writeMeshMaterialsVector(os, vec[i].materials);
@@ -204,6 +216,7 @@ void readMeshNodesVector(std::istream& is, std::vector<MeshNode> &vec){
     vec.resize(size);
 
     for (typename std::vector<MeshNode>::size_type i = 0; i < size; ++i){
+        readString(is, vec[i].name);
         readMeshVerticesVector(is, vec[i].meshVertices);
         readIndicesVector(is, vec[i].indices);
         readMeshMaterialsVector(is, vec[i].materials);
@@ -214,8 +227,9 @@ void processNode(aiNode *node, const aiScene *scene){
 
     for(unsigned int i = 0; i < node->mNumMeshes; i++){
         aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
-        meshdata.meshNodes.push_back(processMesh(mesh, scene));
+        meshdata.meshNodes.push_back(processMesh(mesh, scene, node->mName));
     }
+    
 
     for(unsigned int i = 0; i < node->mNumChildren; i++){
         processNode(node->mChildren[i], scene);
@@ -223,9 +237,11 @@ void processNode(aiNode *node, const aiScene *scene){
 
 }
 
-MeshNode processMesh(aiMesh *mesh, const aiScene *scene){
+MeshNode processMesh(aiMesh *mesh, const aiScene *scene, const aiString& name){
 
     MeshNode meshNode;
+
+    meshNode.name = name.C_Str();
 
     for(unsigned int i = 0; i < mesh->mNumVertices; i++){
 
@@ -265,8 +281,21 @@ MeshNode processMesh(aiMesh *mesh, const aiScene *scene){
     }
 
     aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
-    meshNode.materials = loadMaterialTextures(material, aiTextureType_DIFFUSE, 1);
-
+    meshNode.materials = loadMaterialTextures(material, aiTextureType_SHININESS, 1);
+/*
+    std::cout << "aiTextureType_NONE: "         << material->GetTextureCount(aiTextureType_NONE) << std::endl;
+    std::cout << "aiTextureType_DIFFUSE: "      << material->GetTextureCount(aiTextureType_DIFFUSE) << std::endl;
+    std::cout << "aiTextureType_AMBIENT: "      << material->GetTextureCount(aiTextureType_AMBIENT) << std::endl;
+    std::cout << "aiTextureType_EMISSIVE: "     << material->GetTextureCount(aiTextureType_EMISSIVE) << std::endl;
+    std::cout << "aiTextureType_HEIGHT: "       << material->GetTextureCount(aiTextureType_HEIGHT) << std::endl;
+    std::cout << "aiTextureType_NORMALS: "      << material->GetTextureCount(aiTextureType_NORMALS) << std::endl;
+    std::cout << "aiTextureType_SHININESS: "    << material->GetTextureCount(aiTextureType_SHININESS) << std::endl;
+    std::cout << "aiTextureType_OPACITY: "      << material->GetTextureCount(aiTextureType_OPACITY) << std::endl;
+    std::cout << "aiTextureType_DISPLACEMENT: " << material->GetTextureCount(aiTextureType_DISPLACEMENT) << std::endl;
+    std::cout << "aiTextureType_LIGHTMAP: "     << material->GetTextureCount(aiTextureType_LIGHTMAP) << std::endl;
+    std::cout << "aiTextureType_REFLECTION: "   << material->GetTextureCount(aiTextureType_REFLECTION) << std::endl;
+    std::cout << "aiTextureType_UNKNOWN: "      << material->GetTextureCount(aiTextureType_UNKNOWN) << std::endl;
+*/
     return meshNode;
 
 }
