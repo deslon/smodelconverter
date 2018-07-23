@@ -5,7 +5,6 @@ project (SModelConverter)
 
 set(ASSIMP_BUILD_ASSIMP_TOOLS OFF)
 set(ASSIMP_BUILD_TESTS OFF)
-set(ASSIMP_BUILD_TESTS OFF)
 
 include_directories ("${PROJECT_SOURCE_DIR}/ThirdParty/assimp-4.1.0/include")
 add_subdirectory (ThirdParty/assimp-4.1.0) 
