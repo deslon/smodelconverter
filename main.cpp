@@ -21,7 +21,7 @@ struct Vector2 {
     float y;
 };
 
-struct MeshVertex {
+struct MeshVertexData {
     Vector3 vertex;
     Vector2 texcoord;
     Vector3 normal;
@@ -29,37 +29,37 @@ struct MeshVertex {
     Vector3 bitangent;
 };
 
-struct MeshMaterial {
+struct MeshMaterialData {
     int type;
     std::string texture;
 };
 
-struct MeshNode {
+struct MeshNodeData {
     std::string name;
-    std::vector<MeshVertex> meshVertices;
+    std::vector<MeshVertexData> meshVertices;
     std::vector<unsigned int> indices;
-    std::vector<MeshMaterial> materials;
+    std::vector<MeshMaterialData> materials;
 };
 
 struct MeshData {
-    std::vector<MeshNode> meshNodes;
+    std::vector<MeshNodeData> meshNodes;
 };
 
-void writeMeshVerticesVector(std::ostream& os, const std::vector<MeshVertex> &vec);
+void writeMeshVerticesVector(std::ostream& os, const std::vector<MeshVertexData> &vec);
 void writeIndicesVector(std::ostream& os, const std::vector<unsigned int> &vec);
 void writeString(std::ostream& os, const std::string &str);
-void writeMeshMaterialsVector(std::ostream& os, const std::vector<MeshMaterial> &vec);
-void writeMeshNodesVector(std::ostream& os, const std::vector<MeshNode> &vec);
+void writeMeshMaterialsVector(std::ostream& os, const std::vector<MeshMaterialData> &vec);
+void writeMeshNodesVector(std::ostream& os, const std::vector<MeshNodeData> &vec);
 
-void readMeshVerticesVector(std::istream& is, std::vector<MeshVertex> &vec);
+void readMeshVerticesVector(std::istream& is, std::vector<MeshVertexData> &vec);
 void readIndicesVector(std::istream& is, std::vector<unsigned int> &vec);
 void readString(std::istream& is, std::string &str);
-void readMeshMaterialsVector(std::istream& is, std::vector<MeshMaterial> &vec);
-void readMeshNodesVector(std::istream& is, std::vector<MeshNode> &vec);
+void readMeshMaterialsVector(std::istream& is, std::vector<MeshMaterialData> &vec);
+void readMeshNodesVector(std::istream& is, std::vector<MeshNodeData> &vec);
 
 void processNode(aiNode *node, const aiScene *scene);
-MeshNode processMesh(aiMesh *mesh, const aiScene *scene, const aiString& name);
-std::vector<MeshMaterial> loadMaterialTextures(aiMaterial *mat, aiTextureType assimp_type, int type);
+MeshNodeData processMesh(aiMesh *mesh, const aiScene *scene, const aiString& name);
+std::vector<MeshMaterialData> loadMaterialTextures(aiMaterial *mat, aiTextureType assimp_type, int type);
 
 MeshData meshdata;
 
@@ -138,39 +138,39 @@ int main (int argc, char *argv[]){
   return 0;
 }
 
-void writeMeshVerticesVector(std::ostream& os, const std::vector<MeshVertex> &vec){
-    typename std::vector<MeshVertex>::size_type size = vec.size();
+void writeMeshVerticesVector(std::ostream& os, const std::vector<MeshVertexData> &vec){
+    size_t size = vec.size();
     os.write((char*)&size, sizeof(size));
-    os.write((char*)&vec[0], vec.size() * sizeof(MeshVertex));
+    os.write((char*)&vec[0], vec.size() * sizeof(MeshVertexData));
 }
 
 void writeIndicesVector(std::ostream& os, const std::vector<unsigned int> &vec){
-    typename std::vector<unsigned int>::size_type size = vec.size();
+    size_t size = vec.size();
     os.write((char*)&size, sizeof(size));
     os.write((char*)&vec[0], vec.size() * sizeof(unsigned int));
 }
 
 void writeString(std::ostream& os, const std::string &str){
-    typename std::string::size_type size = str.size();
+    size_t size = str.size();
     os.write((char*)&size, sizeof(size));
     os.write((char*)&str[0], size);
 }
 
-void writeMeshMaterialsVector(std::ostream& os, const std::vector<MeshMaterial> &vec){
-    typename std::vector<MeshMaterial>::size_type size = vec.size();
+void writeMeshMaterialsVector(std::ostream& os, const std::vector<MeshMaterialData> &vec){
+    size_t size = vec.size();
     os.write((char*)&size, sizeof(size));
 
-    for (typename std::vector<MeshMaterial>::size_type i = 0; i < size; ++i){
+    for (size_t i = 0; i < size; ++i){
         os.write((char*)&vec[i].type, sizeof(int));
         writeString(os, vec[i].texture);
     }
 }
 
-void writeMeshNodesVector(std::ostream& os, const std::vector<MeshNode> &vec){
-    typename std::vector<MeshNode>::size_type size = vec.size();
+void writeMeshNodesVector(std::ostream& os, const std::vector<MeshNodeData> &vec){
+    size_t size = vec.size();
     os.write((char*)&size, sizeof(size));
 
-    for (typename std::vector<MeshNode>::size_type i = 0; i < size; ++i){
+    for (size_t i = 0; i < size; ++i){
         writeString(os, vec[i].name);
         writeMeshVerticesVector(os, vec[i].meshVertices);
         writeIndicesVector(os, vec[i].indices);
@@ -178,44 +178,44 @@ void writeMeshNodesVector(std::ostream& os, const std::vector<MeshNode> &vec){
     }
 }
 
-void readMeshVerticesVector(std::istream& is, std::vector<MeshVertex> &vec){
-    typename std::vector<MeshVertex>::size_type size = 0;
+void readMeshVerticesVector(std::istream& is, std::vector<MeshVertexData> &vec){
+    size_t size = 0;
     is.read((char*)&size, sizeof(size));
     vec.resize(size);
-    is.read((char*)&vec[0], vec.size() * sizeof(MeshVertex));
+    is.read((char*)&vec[0], vec.size() * sizeof(MeshVertexData));
 }
 
 void readIndicesVector(std::istream& is, std::vector<unsigned int> &vec){
-    typename std::vector<unsigned int>::size_type size = 0;
+    size_t size = 0;
     is.read((char*)&size, sizeof(size));
     vec.resize(size);
     is.read((char*)&vec[0], vec.size() * sizeof(unsigned int));
 }
 
 void readString(std::istream& is, std::string &str){
-    typename std::string::size_type size = 0;
+    size_t size = 0;
     is.read((char*)&size, sizeof(size));
     str.resize(size);
     is.read((char*)&str[0], size);
 }
 
-void readMeshMaterialsVector(std::istream& is, std::vector<MeshMaterial> &vec){
-    typename std::vector<MeshMaterial>::size_type size = 0;
+void readMeshMaterialsVector(std::istream& is, std::vector<MeshMaterialData> &vec){
+    size_t size = 0;
     is.read((char*)&size, sizeof(size));
     vec.resize(size);
 
-    for (typename std::vector<MeshNode>::size_type i = 0; i < size; ++i){
+    for (size_t i = 0; i < size; ++i){
         is.read((char*)&vec[i].type, sizeof(int));
         readString(is, vec[i].texture);
     }
 }
 
-void readMeshNodesVector(std::istream& is, std::vector<MeshNode> &vec){
-    typename std::vector<MeshVertex>::size_type size = 0;
+void readMeshNodesVector(std::istream& is, std::vector<MeshNodeData> &vec){
+    size_t size = 0;
     is.read((char*)&size, sizeof(size));
     vec.resize(size);
 
-    for (typename std::vector<MeshNode>::size_type i = 0; i < size; ++i){
+    for (size_t i = 0; i < size; ++i){
         readString(is, vec[i].name);
         readMeshVerticesVector(is, vec[i].meshVertices);
         readIndicesVector(is, vec[i].indices);
@@ -224,28 +224,25 @@ void readMeshNodesVector(std::istream& is, std::vector<MeshNode> &vec){
 }
 
 void processNode(aiNode *node, const aiScene *scene){
-
     for(unsigned int i = 0; i < node->mNumMeshes; i++){
         aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
         meshdata.meshNodes.push_back(processMesh(mesh, scene, node->mName));
     }
     
-
     for(unsigned int i = 0; i < node->mNumChildren; i++){
         processNode(node->mChildren[i], scene);
     }
-
 }
 
-MeshNode processMesh(aiMesh *mesh, const aiScene *scene, const aiString& name){
+MeshNodeData processMesh(aiMesh *mesh, const aiScene *scene, const aiString& name){
 
-    MeshNode meshNode;
+    MeshNodeData meshNode;
 
     meshNode.name = name.C_Str();
 
     for(unsigned int i = 0; i < mesh->mNumVertices; i++){
 
-        MeshVertex meshVertex;
+        MeshVertexData meshVertex;
 
         meshVertex.vertex.x = mesh->mVertices[i].x;
         meshVertex.vertex.y = mesh->mVertices[i].y;
@@ -281,7 +278,7 @@ MeshNode processMesh(aiMesh *mesh, const aiScene *scene, const aiString& name){
     }
 
     aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
-    meshNode.materials = loadMaterialTextures(material, aiTextureType_SHININESS, 1);
+    meshNode.materials = loadMaterialTextures(material, aiTextureType_DIFFUSE, 1);
 /*
     std::cout << "aiTextureType_NONE: "         << material->GetTextureCount(aiTextureType_NONE) << std::endl;
     std::cout << "aiTextureType_DIFFUSE: "      << material->GetTextureCount(aiTextureType_DIFFUSE) << std::endl;
@@ -300,12 +297,19 @@ MeshNode processMesh(aiMesh *mesh, const aiScene *scene, const aiString& name){
 
 }
 
-std::vector<MeshMaterial> loadMaterialTextures(aiMaterial *mat, aiTextureType assimp_type, int type){
-    std::vector<MeshMaterial> material;
+std::vector<MeshMaterialData> loadMaterialTextures(aiMaterial *mat, aiTextureType assimp_type, int type){
+    std::vector<MeshMaterialData> material;
+
     for(unsigned int i = 0; i < mat->GetTextureCount(assimp_type); i++){
         aiString str;
         mat->GetTexture(assimp_type, i, &str);
-        material.push_back({type, str.C_Str()});
+
+        MeshMaterialData meshMaterial;
+        meshMaterial.type = type;
+        meshMaterial.texture = str.C_Str();
+
+        material.push_back(meshMaterial);
     }
+
     return material;
 }
