@@ -33,7 +33,7 @@ struct MeshMaterialData {
     int type;
     std::string texture;
 };
-
+/*
 struct BoneVertexWeight{
     unsigned int vertexId;
     float weight;
@@ -43,19 +43,24 @@ struct BoneData {
     std::string name;
     std::vector<BoneVertexWeight> vertexWeights;
 };
-
+*/
 struct MeshNodeData {
     std::string name;
     std::vector<MeshVertexData> meshVertices;
     std::vector<unsigned int> indices;
     std::vector<MeshMaterialData> materials;
-    std::vector<BoneData> bones;
+    //std::vector<BoneData> bones;
 };
 
-struct ModelNodeData {
+struct BoneData {
+    std::string name;
+    std::vector<BoneData> children;
+};
+
+struct ModelData {
     std::string name;
     std::vector<MeshNodeData> meshNodes;
-    std::vector<ModelNodeData> nodes;
+    BoneData skeleton;
 };
 
 void writeMeshVerticesVector(std::ostream& os, const std::vector<MeshVertexData> &vec);
@@ -63,8 +68,8 @@ void writeIndicesVector(std::ostream& os, const std::vector<unsigned int> &vec);
 void writeString(std::ostream& os, const std::string &str);
 void writeMeshMaterialsVector(std::ostream& os, const std::vector<MeshMaterialData> &vec);
 void writeMeshNodesVector(std::ostream& os, const std::vector<MeshNodeData> &vec);
-void writeModelNodesVector(std::ostream& os, const std::vector<ModelNodeData> &vec);
-void writeModelNode(std::ostream& os, const ModelNodeData &modelNode);
+void writeModelNodesVector(std::ostream& os, const std::vector<ModelData> &vec);
+void writeModelNode(std::ostream& os, const ModelData &modelNode);
 
 void readMeshVerticesVector(std::istream& is, std::vector<MeshVertexData> &vec);
 void readIndicesVector(std::istream& is, std::vector<unsigned int> &vec);
@@ -72,14 +77,16 @@ void readString(std::istream& is, std::string &str);
 void readMeshMaterialsVector(std::istream& is, std::vector<MeshMaterialData> &vec);
 void readMeshNodesVector(std::istream& is, std::vector<MeshNodeData> &vec);
 
-ModelNodeData processNode(aiNode *node, const aiScene *scene);
+void processNode(aiNode *node, const aiScene *scene);
 MeshNodeData processMesh(const aiMesh *mesh, const aiMaterial* material);
-std::vector<BoneData> processBones(const aiMesh *mesh);
+BoneData processBone(const aiNode *node);
+//std::vector<BoneData> processBones(const aiMesh *mesh);
 std::vector<MeshMaterialData> processMaterials(const aiMaterial *mat, aiTextureType assimp_type, int type);
 
-void printNode(const ModelNodeData &modelNode, int layerTree = 0);
+void printModel(const ModelData &modelNode);
+void printSkeleton(const BoneData &bone, int layerTree = 0);
 
-ModelNodeData modeldata;
+ModelData modeldata;
 
 int main (int argc, char *argv[]){
     if (argc < 2){
@@ -100,7 +107,8 @@ int main (int argc, char *argv[]){
 
     //directory = path.substr(0, path.find_last_of('/'));
 
-    modeldata = processNode(scene->mRootNode, scene);
+    processNode(scene->mRootNode, scene);
+    modeldata.skeleton = processBone(scene->mRootNode);
 /*
     int version = 1;
 
@@ -125,7 +133,7 @@ int main (int argc, char *argv[]){
 */
     printf("\n-----------Model summary---------------\n\n");
 
-    printNode(modeldata);
+    printModel(modeldata);
 /*
     printf("Nodes count: %i\n", (int)modeldata.meshNodes.size());
     for (int i = 0; i < modeldata.meshNodes.size(); i++){
@@ -160,46 +168,42 @@ int main (int argc, char *argv[]){
 */
   return 0;
 }
+void printModel(const ModelData &modelNode){
 
-void printNode(const ModelNodeData &modelNode, int layerTree){
+    printf("Model name: %s\n", modelNode.name.c_str());
+
+
+        for (int i = 0; i < modelNode.meshNodes.size(); i++){
+            printf(">Mesh (%s), vertices: %i, bones: \n", 
+                modelNode.meshNodes[i].name.c_str(), 
+                (int)modelNode.meshNodes[i].meshVertices.size()); 
+                //(int)modelNode.meshNodes[i].bones.size()
+/*
+            for (int b = 0; b < modelNode.meshNodes[i].bones.size(); b++){
+                printf(">>Bone (%s), weights: %i\n", 
+                    modelNode.meshNodes[i].bones[b].name.c_str(), 
+                    (int)modelNode.meshNodes[i].bones[b].vertexWeights.size());
+            }
+*/
+        }
+    
+    printSkeleton(modelNode.skeleton);
+}
+
+void printSkeleton(const BoneData &bone, int layerTree){
     std::string strtree;
     for(int i = 0; i < layerTree; i++){
         strtree += "-";
     }
-    printf("%sNode name: %s\n", strtree.c_str(), modelNode.name.c_str());
+    printf("%sBone name: %s\n", strtree.c_str(), bone.name.c_str());
 
-    if (modelNode.meshNodes.size() > 0){
-        for (int i = 0; i < modelNode.meshNodes.size(); i++){
-            printf("%s>Mesh (%s), vertices: %i, bones: %i\n", strtree.c_str(), 
-                modelNode.meshNodes[i].name.c_str(), 
-                (int)modelNode.meshNodes[i].meshVertices.size(), 
-                (int)modelNode.meshNodes[i].bones.size());
-
-            for (int b = 0; b < modelNode.meshNodes[i].bones.size(); b++){
-                printf("%s>>Bone (%s), weights: %i\n", strtree.c_str(), 
-                    modelNode.meshNodes[i].bones[b].name.c_str(), 
-                    (int)modelNode.meshNodes[i].bones[b].vertexWeights.size());
-            }
-        }
+    for (int i = 0; i < bone.children.size(); i++){
+        printSkeleton(bone.children[i], layerTree+1);
     }
 
-    for (int i = 0; i < modelNode.nodes.size(); i++){
-        printNode(modelNode.nodes[i], layerTree+1);
-    }
-    /*
-    for (int i = 0; i < modeldata.meshNodes.size(); i++){
-        printf("+++++++++\n");
-        printf("Node name: %s\n", modeldata.meshNodes[i].name.c_str());
-        printf("Vertex count: %i\n", (int)modeldata.meshNodes[i].meshVertices.size());
-        if ( modeldata.meshNodes[i].meshVertices.size() > 0)
-            printf("First vertex: x: %f, y: %f, z: %f\n", modeldata.meshNodes[i].meshVertices[0].vertex.x, modeldata.meshNodes[i].meshVertices[0].vertex.y, modeldata.meshNodes[i].meshVertices[0].vertex.z);
-        printf("Index count: %i\n", (int)modeldata.meshNodes[i].indices.size());
-        if ( modeldata.meshNodes[i].materials.size() > 0)
-            printf("Texture: %s\n", modeldata.meshNodes[i].materials[0].texture.c_str());
-    }
-    */
 }
 
+/*
 void writeMeshVerticesVector(std::ostream& os, const std::vector<MeshVertexData> &vec){
     size_t size = vec.size();
     os.write((char*)&size, sizeof(size));
@@ -299,24 +303,41 @@ void readMeshNodesVector(std::istream& is, std::vector<MeshNodeData> &vec){
         readMeshMaterialsVector(is, vec[i].materials);
     }
 }
+*/
+void processNode(aiNode *node, const aiScene *scene){
 
-ModelNodeData processNode(aiNode *node, const aiScene *scene){
-    ModelNodeData modelNode;
+    //printf("name: %s\n", node->mName.C_Str());
 
-    modelNode.name = node->mName.C_Str();
+    if ((modeldata.name == "") && (node->mNumMeshes > 0)){
+        modeldata.name = node->mName.C_Str();
 
-    for(unsigned int i = 0; i < node->mNumMeshes; i++){
-        aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
-        aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+        for(unsigned int i = 0; i < node->mNumMeshes; i++){
+            aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
+            aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
 
-        modelNode.meshNodes.push_back(processMesh(mesh, material));
+            modeldata.meshNodes.push_back(processMesh(mesh, material));
+        }
     }
-    
+
     for(unsigned int i = 0; i < node->mNumChildren; i++){
-        modelNode.nodes.push_back(processNode(node->mChildren[i], scene));
+        processNode(node->mChildren[i], scene);
     }
+}
 
-    return modelNode;
+BoneData processBone(const aiNode *node){
+
+    BoneData boneData;
+
+    //if (node->mNumMeshes == 0){
+        boneData.name = node->mName.C_Str();
+
+        for(unsigned int i = 0; i < node->mNumChildren; i++){
+            if (node->mChildren[i]->mNumMeshes == 0)
+                boneData.children.push_back(processBone(node->mChildren[i]));
+        }
+    //}
+
+    return boneData;
 }
 
 MeshNodeData processMesh(const aiMesh *mesh, const aiMaterial* material){
@@ -380,7 +401,7 @@ MeshNodeData processMesh(const aiMesh *mesh, const aiMaterial* material){
     }
 
     meshNode.materials = processMaterials(material, aiTextureType_DIFFUSE, 1);
-    meshNode.bones = processBones(mesh);
+    //meshNode.bones = processBones(mesh);
     
 /*
     std::cout << "aiTextureType_NONE: "         << material->GetTextureCount(aiTextureType_NONE) << std::endl;
@@ -398,7 +419,7 @@ MeshNodeData processMesh(const aiMesh *mesh, const aiMaterial* material){
 */
     return meshNode;
 }
-
+/*
 std::vector<BoneData> processBones(const aiMesh *mesh){
 
     std::vector<BoneData> bonesData;
@@ -425,7 +446,7 @@ std::vector<BoneData> processBones(const aiMesh *mesh){
 
     return bonesData;
 }
-
+*/
 std::vector<MeshMaterialData> processMaterials(const aiMaterial *mat, aiTextureType assimp_type, int type){
     std::vector<MeshMaterialData> material;
 
