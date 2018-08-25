@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <vector>
+#include <map>
 
 #include <iostream>
 #include <fstream>
@@ -9,6 +10,13 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+
+struct Quaternion {
+    float x;
+    float y;
+    float z;
+    float w;
+};
 
 struct Vector3 {
     float x;
@@ -33,41 +41,50 @@ struct MeshMaterialData {
     int type;
     std::string texture;
 };
-/*
+
 struct BoneVertexWeight{
     unsigned int vertexId;
     float weight;
 };
 
-struct BoneData {
+struct BoneWeightData {
     std::string name;
     std::vector<BoneVertexWeight> vertexWeights;
 };
-*/
-struct MeshNodeData {
+
+struct MeshData {
     std::string name;
     std::vector<MeshVertexData> meshVertices;
     std::vector<unsigned int> indices;
     std::vector<MeshMaterialData> materials;
-    //std::vector<BoneData> bones;
+    std::vector<BoneWeightData> bonesWeights;
 };
 
 struct BoneData {
     std::string name;
+    Vector3 bindPosition;
+    Quaternion bindRotation;
+    Vector3 bindScale;
+    float** offsetMatrix;
     std::vector<BoneData> children;
 };
 
 struct ModelData {
     std::string name;
-    std::vector<MeshNodeData> meshNodes;
-    BoneData skeleton;
+    std::vector<MeshData> meshes;
+    std::vector<Vector3> vertices;
+    std::vector<Vector2> texcoords;
+    std::vector<Vector3> normals;
+    std::vector<Vector3> tangents;
+    std::vector<Vector3> bitangents;
+    BoneData* skeleton;
 };
 
 void writeMeshVerticesVector(std::ostream& os, const std::vector<MeshVertexData> &vec);
 void writeIndicesVector(std::ostream& os, const std::vector<unsigned int> &vec);
 void writeString(std::ostream& os, const std::string &str);
 void writeMeshMaterialsVector(std::ostream& os, const std::vector<MeshMaterialData> &vec);
-void writeMeshNodesVector(std::ostream& os, const std::vector<MeshNodeData> &vec);
+void writeMeshNodesVector(std::ostream& os, const std::vector<MeshData> &vec);
 void writeModelNodesVector(std::ostream& os, const std::vector<ModelData> &vec);
 void writeModelNode(std::ostream& os, const ModelData &modelNode);
 
@@ -75,18 +92,31 @@ void readMeshVerticesVector(std::istream& is, std::vector<MeshVertexData> &vec);
 void readIndicesVector(std::istream& is, std::vector<unsigned int> &vec);
 void readString(std::istream& is, std::string &str);
 void readMeshMaterialsVector(std::istream& is, std::vector<MeshMaterialData> &vec);
-void readMeshNodesVector(std::istream& is, std::vector<MeshNodeData> &vec);
+void readMeshNodesVector(std::istream& is, std::vector<MeshData> &vec);
 
-void processNode(aiNode *node, const aiScene *scene);
-MeshNodeData processMesh(const aiMesh *mesh, const aiMaterial* material);
-BoneData processBone(const aiNode *node);
-//std::vector<BoneData> processBones(const aiMesh *mesh);
+std::vector<MeshData> collectModelMeshes(const aiScene *scene, aiNode *node);
+std::string collectModelName(const aiScene *scene, aiNode *node);
+MeshData processMesh(const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh, const aiMaterial* material);
+BoneData* collectBones(const aiScene *scene, const aiNode *node);
+std::vector<BoneWeightData> processBonesWeights(const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh);
 std::vector<MeshMaterialData> processMaterials(const aiMaterial *mat, aiTextureType assimp_type, int type);
+void selectNecessaryNodes(aiNode* node, const aiNode* modelRoot);
+bool compareMeshNodeOrParent(const aiNode* node, const aiNode* modelRoot);
+float** getOffsetMatrix(const aiScene *scene, const aiString boneName);
+aiMatrix4x4 getDerivedTransform(const aiNode* node, const aiNode* sceneRoot);
+aiMatrix4x4 getInverseDerivedTransform(const aiNode* node, const aiNode* sceneRoot);
+float** convertAssimpMatrix4(const aiMatrix4x4 matrix);
 
 void printModel(const ModelData &modelNode);
 void printSkeleton(const BoneData &bone, int layerTree = 0);
 
+
 ModelData modeldata;
+
+aiNode* sceneRoot = NULL;
+aiNode* modelRoot = NULL;
+aiNode* boneRoot = NULL;
+std::map<aiNode*, bool> necessaryNodes;
 
 int main (int argc, char *argv[]){
     if (argc < 2){
@@ -96,9 +126,27 @@ int main (int argc, char *argv[]){
 
     std::string path = argv[1];
 
+    unsigned flags =
+        aiProcess_Triangulate |
+        //aiProcess_ConvertToLeftHanded |
+        aiProcess_JoinIdenticalVertices |
+        aiProcess_CalcTangentSpace | 
+        aiProcess_FlipUVs |
+        aiProcess_GenNormals |
+        //aiProcess_GenSmoothNormals |
+        aiProcess_LimitBoneWeights |
+        aiProcess_ImproveCacheLocality |
+        aiProcess_RemoveRedundantMaterials |
+        aiProcess_FixInfacingNormals |
+        aiProcess_FindInvalidData |
+        aiProcess_GenUVCoords |
+        aiProcess_FindInstances |
+        aiProcess_OptimizeMeshes;
+
     Assimp::Importer importer;
-    //importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
-    const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_CalcTangentSpace | aiProcess_FlipUVs | aiProcess_JoinIdenticalVertices);
+    importer.SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
+
+    const aiScene* scene = importer.ReadFile(path, flags);
 
     if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
         printf("ERROR::ASSIMP:: %s\n", importer.GetErrorString());
@@ -107,8 +155,11 @@ int main (int argc, char *argv[]){
 
     //directory = path.substr(0, path.find_last_of('/'));
 
-    processNode(scene->mRootNode, scene);
-    modeldata.skeleton = processBone(scene->mRootNode);
+    sceneRoot = scene->mRootNode;
+
+    modeldata.name = collectModelName(scene, sceneRoot);
+    modeldata.meshes = collectModelMeshes(scene, modelRoot);
+    modeldata.skeleton = collectBones(scene, boneRoot);
 /*
     int version = 1;
 
@@ -173,21 +224,21 @@ void printModel(const ModelData &modelNode){
     printf("Model name: %s\n", modelNode.name.c_str());
 
 
-        for (int i = 0; i < modelNode.meshNodes.size(); i++){
-            printf(">Mesh (%s), vertices: %i, bones: \n", 
-                modelNode.meshNodes[i].name.c_str(), 
-                (int)modelNode.meshNodes[i].meshVertices.size()); 
-                //(int)modelNode.meshNodes[i].bones.size()
+        for (int i = 0; i < modelNode.meshes.size(); i++){
+            printf(">Mesh (%s), vertices: %i, bones weights: %i\n", 
+                modelNode.meshes[i].name.c_str(), 
+                (int)modelNode.meshes[i].meshVertices.size(),
+                (int)modelNode.meshes[i].bonesWeights.size());
 /*
-            for (int b = 0; b < modelNode.meshNodes[i].bones.size(); b++){
+            for (int b = 0; b < modelNode.meshes[i].bones.size(); b++){
                 printf(">>Bone (%s), weights: %i\n", 
-                    modelNode.meshNodes[i].bones[b].name.c_str(), 
-                    (int)modelNode.meshNodes[i].bones[b].vertexWeights.size());
+                    modelNode.meshes[i].bones[b].name.c_str(), 
+                    (int)modelNode.meshes[i].bones[b].vertexWeights.size());
             }
 */
         }
-    
-    printSkeleton(modelNode.skeleton);
+    if (modelNode.skeleton)
+        printSkeleton(*modelNode.skeleton);
 }
 
 void printSkeleton(const BoneData &bone, int layerTree){
@@ -196,6 +247,12 @@ void printSkeleton(const BoneData &bone, int layerTree){
         strtree += "-";
     }
     printf("%sBone name: %s\n", strtree.c_str(), bone.name.c_str());
+    printf("%s  Position: %f %f %f\n", strtree.c_str(), bone.bindPosition.x, bone.bindPosition.y, bone.bindPosition.z);
+    printf("%s  Rotation: %f %f %f %f\n", strtree.c_str(), bone.bindRotation.x, bone.bindRotation.y, bone.bindRotation.z, bone.bindRotation.w);
+    printf("%s  Scale: %f %f %f\n", strtree.c_str(), bone.bindScale.x, bone.bindScale.y, bone.bindScale.z);
+    printf("%s  Offset:\n", strtree.c_str());
+    for (unsigned int i = 0; i < 4; i++)
+        printf("%s    %f %f %f %f\n", strtree.c_str(), bone.offsetMatrix[i][0], bone.offsetMatrix[i][1], bone.offsetMatrix[i][2], bone.offsetMatrix[i][3]);
 
     for (int i = 0; i < bone.children.size(); i++){
         printSkeleton(bone.children[i], layerTree+1);
@@ -232,7 +289,7 @@ void writeMeshMaterialsVector(std::ostream& os, const std::vector<MeshMaterialDa
     }
 }
 
-void writeMeshNodesVector(std::ostream& os, const std::vector<MeshNodeData> &vec){
+void writeMeshNodesVector(std::ostream& os, const std::vector<MeshData> &vec){
     size_t size = vec.size();
     os.write((char*)&size, sizeof(size));
 
@@ -255,7 +312,7 @@ void writeModelNodesVector(std::ostream& os, const std::vector<ModelNodeData> &v
 
 void writeModelNode(std::ostream& os, const ModelNodeData &modelNode){
     writeString(os, modelNode.name);
-    writeMeshNodesVector(os, modelNode.meshNodes);
+    writeMeshNodesVector(os, modelNode.meshes);
     writeModelNodesVector(os, modelNode.nodes);
 }
 
@@ -291,7 +348,7 @@ void readMeshMaterialsVector(std::istream& is, std::vector<MeshMaterialData> &ve
     }
 }
 
-void readMeshNodesVector(std::istream& is, std::vector<MeshNodeData> &vec){
+void readMeshNodesVector(std::istream& is, std::vector<MeshData> &vec){
     size_t size = 0;
     is.read((char*)&size, sizeof(size));
     vec.resize(size);
@@ -304,47 +361,160 @@ void readMeshNodesVector(std::istream& is, std::vector<MeshNodeData> &vec){
     }
 }
 */
-void processNode(aiNode *node, const aiScene *scene){
+std::string collectModelName(const aiScene *scene, aiNode *node){
 
-    //printf("name: %s\n", node->mName.C_Str());
+    if (node->mNumMeshes > 0){
 
-    if ((modeldata.name == "") && (node->mNumMeshes > 0)){
-        modeldata.name = node->mName.C_Str();
+        modelRoot = node;
 
-        for(unsigned int i = 0; i < node->mNumMeshes; i++){
-            aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
-            aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
-
-            modeldata.meshNodes.push_back(processMesh(mesh, material));
-        }
+        return node->mName.C_Str();
     }
 
     for(unsigned int i = 0; i < node->mNumChildren; i++){
-        processNode(node->mChildren[i], scene);
+        std::string childReturn = collectModelName(scene, node->mChildren[i]);
+        if (!childReturn.empty())
+            return childReturn;
     }
+
+    return "";
 }
 
-BoneData processBone(const aiNode *node){
+std::vector<MeshData> collectModelMeshes(const aiScene *scene, aiNode *node){
 
-    BoneData boneData;
+    std::vector<MeshData> meshes;
 
-    //if (node->mNumMeshes == 0){
-        boneData.name = node->mName.C_Str();
+    for(unsigned int i = 0; i < node->mNumMeshes; i++){
+        aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
+        aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+
+        meshes.push_back(processMesh(scene, node, mesh, material));
+    }
+
+    return meshes;
+
+}
+
+float** convertAssimpMatrix4(const aiMatrix4x4 matrix){
+    float** convMatrix = new float*[4];
+    for (int i = 0; i < 4; i++){
+        convMatrix[i] = new float[4];
+        for (int j = 0; j < 4; j++){
+            convMatrix[i][j] = matrix[i][j];
+        }
+    }
+
+    return convMatrix;
+}
+
+aiMatrix4x4 getInverseDerivedTransform(const aiNode* node, const aiNode* sceneRoot){
+    aiMatrix4x4 nodeDerivedInverse;
+
+    if (modelRoot != sceneRoot)
+        nodeDerivedInverse = getDerivedTransform(modelRoot, sceneRoot);
+    nodeDerivedInverse.Inverse();
+
+    return nodeDerivedInverse;
+}
+
+float** getOffsetMatrix(const aiScene *scene, const aiString boneName){
+
+    aiMatrix4x4 offset;
+
+    for (unsigned i = 0; i < modelRoot->mNumMeshes; i++){
+
+        aiMesh* mesh = scene->mMeshes[modelRoot->mMeshes[i]];
+        for (unsigned j = 0; j < mesh->mNumBones; j++){
+
+            aiBone* bone = mesh->mBones[j];
+            if (boneName == bone->mName){
+                offset = bone->mOffsetMatrix;
+                offset *= getInverseDerivedTransform(modelRoot, sceneRoot);
+                return convertAssimpMatrix4(offset);
+            }
+        }
+    }
+
+    if (boneName == modelRoot->mName){
+        for (unsigned i = 0; i < modelRoot->mNumMeshes; i++){
+
+            aiMesh* mesh = scene->mMeshes[modelRoot->mMeshes[i]];
+            if (!mesh->HasBones()){
+                offset *= getInverseDerivedTransform(modelRoot, sceneRoot);
+                return convertAssimpMatrix4(offset);
+            }
+
+        }
+    }
+
+    return convertAssimpMatrix4(offset);
+}
+
+BoneData* collectBones(const aiScene *scene, const aiNode *node){
+
+    if (necessaryNodes[(aiNode*)node]){
+
+        BoneData* boneData = new BoneData;
+
+        aiMatrix4x4 transform = node->mTransformation;
+
+        if (node == boneRoot){
+            transform = getDerivedTransform(node, sceneRoot);
+        }
+
+        aiVector3D aiPos;
+        aiQuaternion aiRot;
+        aiVector3D aiScale;
+        transform.Decompose(aiScale, aiRot, aiPos);
+    
+        boneData->bindPosition.x = aiPos.x;
+        boneData->bindPosition.y = aiPos.y;
+        boneData->bindPosition.z = aiPos.z;
+
+        boneData->bindRotation.x = aiRot.x;
+        boneData->bindRotation.y = aiRot.y;
+        boneData->bindRotation.z = aiRot.z;
+        boneData->bindRotation.w = aiRot.w;
+
+        boneData->bindScale.x = aiScale.x;
+        boneData->bindScale.y = aiScale.y;
+        boneData->bindScale.z = aiScale.z;
+
+        boneData->name = node->mName.C_Str();
+
+        boneData->offsetMatrix = getOffsetMatrix(scene, node->mName);
 
         for(unsigned int i = 0; i < node->mNumChildren; i++){
             if (node->mChildren[i]->mNumMeshes == 0)
-                boneData.children.push_back(processBone(node->mChildren[i]));
+                if (necessaryNodes[node->mChildren[i]])
+                    boneData->children.push_back(*collectBones(scene, node->mChildren[i]));
         }
-    //}
 
-    return boneData;
+
+        return boneData;
+    }
+
+    
 }
 
-MeshNodeData processMesh(const aiMesh *mesh, const aiMaterial* material){
 
-    MeshNodeData meshNode;
+aiMatrix4x4 getDerivedTransform(const aiNode* node, const aiNode* sceneRoot){
 
-    meshNode.name = mesh->mName.C_Str();
+    aiMatrix4x4 transform = node->mTransformation;
+
+    while (node && node != sceneRoot)
+    {
+        node = node->mParent;
+        if (node)
+            transform = node->mTransformation * transform;
+    }
+    return transform;
+}
+
+MeshData processMesh(const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh, const aiMaterial* material){
+
+    MeshData meshData;
+
+    meshData.name = mesh->mName.C_Str();
 
     for(unsigned int i = 0; i < mesh->mNumVertices; i++){
 
@@ -390,18 +560,18 @@ MeshNodeData processMesh(const aiMesh *mesh, const aiMaterial* material){
             meshVertex.bitangent.z = 0.0f;
         }
 
-        meshNode.meshVertices.push_back(meshVertex);
+        meshData.meshVertices.push_back(meshVertex);
         
     }
 
     for(unsigned int i = 0; i < mesh->mNumFaces; i++){
         aiFace face = mesh->mFaces[i];
         for(unsigned int j = 0; j < face.mNumIndices; j++)
-            meshNode.indices.push_back(face.mIndices[j]);
+            meshData.indices.push_back(face.mIndices[j]);
     }
 
-    meshNode.materials = processMaterials(material, aiTextureType_DIFFUSE, 1);
-    //meshNode.bones = processBones(mesh);
+    meshData.materials = processMaterials(material, aiTextureType_DIFFUSE, 1);
+    meshData.bonesWeights = processBonesWeights(scene, modelRoot, mesh);
     
 /*
     std::cout << "aiTextureType_NONE: "         << material->GetTextureCount(aiTextureType_NONE) << std::endl;
@@ -417,18 +587,18 @@ MeshNodeData processMesh(const aiMesh *mesh, const aiMaterial* material){
     std::cout << "aiTextureType_REFLECTION: "   << material->GetTextureCount(aiTextureType_REFLECTION) << std::endl;
     std::cout << "aiTextureType_UNKNOWN: "      << material->GetTextureCount(aiTextureType_UNKNOWN) << std::endl;
 */
-    return meshNode;
+    return meshData;
 }
-/*
-std::vector<BoneData> processBones(const aiMesh *mesh){
 
-    std::vector<BoneData> bonesData;
+std::vector<BoneWeightData> processBonesWeights(const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh){
+
+    std::vector<BoneWeightData> bonesData;
 
     for(unsigned int i = 0; i < mesh->mNumBones; i++){
         //printf("Bone name %s\n", mesh->mBones[i]->mName.C_Str());
         //printf("Matrix %f\n", mesh->mBones[i]->mOffsetMatrix[0][0]);
 
-        BoneData boneData;
+        BoneWeightData boneData;
 
         boneData.name = mesh->mBones[i]->mName.C_Str();
 
@@ -442,11 +612,37 @@ std::vector<BoneData> processBones(const aiMesh *mesh){
         }
 
         bonesData.push_back(boneData);
+
+        selectNecessaryNodes(sceneRoot->FindNode(mesh->mBones[i]->mName), modelRoot);
     }
 
     return bonesData;
 }
-*/
+
+void selectNecessaryNodes(aiNode* node, const aiNode* modelRoot){
+    while (node){
+        if (!compareMeshNodeOrParent(node, modelRoot)){
+            necessaryNodes[node] = true;
+            boneRoot = node;
+        }
+        node = node->mParent;
+    }
+}
+
+bool compareMeshNodeOrParent(const aiNode* node, const aiNode* modelRoot){
+    aiNode* currentMeshNode = (aiNode*)modelRoot;
+
+    while (currentMeshNode){
+        if (currentMeshNode == node)
+            return true;
+
+        currentMeshNode = currentMeshNode->mParent;
+    }
+
+    return false;
+}
+
+
 std::vector<MeshMaterialData> processMaterials(const aiMaterial *mat, aiTextureType assimp_type, int type){
     std::vector<MeshMaterialData> material;
 
