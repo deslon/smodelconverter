@@ -9,7 +9,7 @@ set(ASSIMP_BUILD_TESTS OFF)
 include_directories ("${PROJECT_SOURCE_DIR}/ThirdParty/assimp-4.1.0/include")
 add_subdirectory (ThirdParty/assimp-4.1.0) 
 
-add_executable(smodelconverter main.cpp)
+add_executable(smodelconverter main.cpp readwriteSModel.cpp)
 
 target_link_libraries (smodelconverter assimp)
 

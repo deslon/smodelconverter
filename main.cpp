@@ -11,75 +11,10 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
-struct Quaternion {
-    float x;
-    float y;
-    float z;
-    float w;
-};
+#include "modeldata.h"
+#include "readwriteSModel.h"
 
-struct Vector3 {
-    float x;
-    float y;
-    float z;
-};
-
-struct Vector2 {
-    float x;
-    float y;
-};
-
-struct MeshVertexData {
-    Vector3 vertex;
-    Vector2 texcoord;
-    Vector3 normal;
-    Vector3 tangent;
-    Vector3 bitangent;
-};
-
-struct MeshMaterialData {
-    int type;
-    std::string texture;
-};
-
-struct BoneVertexWeight{
-    unsigned int vertexId;
-    float weight;
-};
-
-struct BoneWeightData {
-    std::string name;
-    std::vector<BoneVertexWeight> vertexWeights;
-};
-
-struct MeshData {
-    std::string name;
-    std::vector<MeshVertexData> meshVertices;
-    std::vector<unsigned int> indices;
-    std::vector<MeshMaterialData> materials;
-    std::vector<BoneWeightData> bonesWeights;
-};
-
-struct BoneData {
-    std::string name;
-    Vector3 bindPosition;
-    Quaternion bindRotation;
-    Vector3 bindScale;
-    float** offsetMatrix;
-    std::vector<BoneData> children;
-};
-
-struct ModelData {
-    std::string name;
-    std::vector<MeshData> meshes;
-    std::vector<Vector3> vertices;
-    std::vector<Vector2> texcoords;
-    std::vector<Vector3> normals;
-    std::vector<Vector3> tangents;
-    std::vector<Vector3> bitangents;
-    BoneData* skeleton;
-};
-
+/*
 void writeMeshVerticesVector(std::ostream& os, const std::vector<MeshVertexData> &vec);
 void writeIndicesVector(std::ostream& os, const std::vector<unsigned int> &vec);
 void writeString(std::ostream& os, const std::string &str);
@@ -93,13 +28,13 @@ void readIndicesVector(std::istream& is, std::vector<unsigned int> &vec);
 void readString(std::istream& is, std::string &str);
 void readMeshMaterialsVector(std::istream& is, std::vector<MeshMaterialData> &vec);
 void readMeshNodesVector(std::istream& is, std::vector<MeshData> &vec);
-
+*/
 std::vector<MeshData> collectModelMeshes(const aiScene *scene, aiNode *node);
 std::string collectModelName(const aiScene *scene, aiNode *node);
 MeshData processMesh(const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh, const aiMaterial* material);
 BoneData* collectBones(const aiScene *scene, const aiNode *node);
-std::vector<BoneWeightData> processBonesWeights(const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh);
-std::vector<MeshMaterialData> processMaterials(const aiMaterial *mat, aiTextureType assimp_type, int type);
+std::vector<BoneWeightData> processBonesWeights(const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh, int vertexOffset);
+std::vector<MaterialData> processMaterials(const aiMaterial *mat, aiTextureType assimp_type, int type);
 void selectNecessaryNodes(aiNode* node, const aiNode* modelRoot);
 bool compareMeshNodeOrParent(const aiNode* node, const aiNode* modelRoot);
 float** getOffsetMatrix(const aiScene *scene, const aiString boneName);
@@ -160,16 +95,12 @@ int main (int argc, char *argv[]){
     modeldata.name = collectModelName(scene, sceneRoot);
     modeldata.meshes = collectModelMeshes(scene, modelRoot);
     modeldata.skeleton = collectBones(scene, boneRoot);
-/*
-    int version = 1;
 
     std::ofstream os;
     os.open("test.smodel", std::ios::out | std::ios::binary);
-    os.write("SMODEL", sizeof(char) * 6);
-    os.write((char*)&version, sizeof(int));
-    writeModelNode(os, modeldata);
+    writeModel(os, modeldata);
     os.close();
-    */
+    
 /*
     char* readsig= new char[6];
     int readversion;
@@ -219,26 +150,24 @@ int main (int argc, char *argv[]){
 */
   return 0;
 }
-void printModel(const ModelData &modelNode){
+void printModel(const ModelData &modelData){
 
-    printf("Model name: %s\n", modelNode.name.c_str());
+    printf("Model name: %s, vertices: %i, bone weights: %i\n", modelData.name.c_str(), (int)modelData.vertices.size(), (int)modelData.bonesWeights.size());
 
-
-        for (int i = 0; i < modelNode.meshes.size(); i++){
-            printf(">Mesh (%s), vertices: %i, bones weights: %i\n", 
-                modelNode.meshes[i].name.c_str(), 
-                (int)modelNode.meshes[i].meshVertices.size(),
-                (int)modelNode.meshes[i].bonesWeights.size());
+        for (int i = 0; i < modelData.meshes.size(); i++){
+            printf(">Mesh (%s), indices: %i\n", 
+                modelData.meshes[i].name.c_str(), 
+                (int)modelData.meshes[i].indices.size());
 /*
-            for (int b = 0; b < modelNode.meshes[i].bones.size(); b++){
+            for (int b = 0; b < modelData.meshes[i].bones.size(); b++){
                 printf(">>Bone (%s), weights: %i\n", 
-                    modelNode.meshes[i].bones[b].name.c_str(), 
-                    (int)modelNode.meshes[i].bones[b].vertexWeights.size());
+                    modelData.meshes[i].bones[b].name.c_str(), 
+                    (int)modelData.meshes[i].bones[b].vertexWeights.size());
             }
 */
         }
-    if (modelNode.skeleton)
-        printSkeleton(*modelNode.skeleton);
+    if (modelData.skeleton)
+        printSkeleton(*modelData.skeleton);
 }
 
 void printSkeleton(const BoneData &bone, int layerTree){
@@ -493,6 +422,7 @@ BoneData* collectBones(const aiScene *scene, const aiNode *node){
         return boneData;
     }
 
+    return NULL;
     
 }
 
@@ -512,66 +442,82 @@ aiMatrix4x4 getDerivedTransform(const aiNode* node, const aiNode* sceneRoot){
 
 MeshData processMesh(const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh, const aiMaterial* material){
 
+    int vertexOffset = (int)modeldata.vertices.size();
+
+    modeldata.texcoords.resize(mesh->GetNumUVChannels());
+
+    for(unsigned int i = 0; i < mesh->mNumVertices; i++){
+
+        Vector3 vertex;
+        vertex.x = mesh->mVertices[i].x;
+        vertex.y = mesh->mVertices[i].y;
+        vertex.z = mesh->mVertices[i].z;
+        modeldata.vertices.push_back(vertex);
+        
+        for (unsigned uv = 0; uv < mesh->GetNumUVChannels(); uv++){
+
+            Vector2 texcoord;
+            if(mesh->HasTextureCoords(uv)) {
+                texcoord.x = mesh->mTextureCoords[uv][i].x; 
+                texcoord.y = mesh->mTextureCoords[uv][i].y;
+            } else {
+                texcoord.x = 0.0f; 
+                texcoord.y = 0.0f;
+            }
+
+            modeldata.texcoords[uv].push_back(texcoord);
+        }
+
+        Vector3 normal;
+        if (mesh->HasNormals()){
+            normal.x = mesh->mNormals[i].x;
+            normal.y = mesh->mNormals[i].y;
+            normal.z = mesh->mNormals[i].z;
+        }else{
+            normal.x = 0.0f;
+            normal.y = 0.0f;
+            normal.z = 0.0f;
+        }
+        modeldata.normals.push_back(normal);
+
+        Vector3 tangent;
+        Vector3 bitangent;
+        if (mesh->HasTangentsAndBitangents()){
+            tangent.x = mesh->mTangents[i].x;
+            tangent.y = mesh->mTangents[i].y;
+            tangent.z = mesh->mTangents[i].z;
+
+            bitangent.x = mesh->mBitangents[i].x;
+            bitangent.y = mesh->mBitangents[i].y;
+            bitangent.z = mesh->mBitangents[i].z;
+        }else{
+            tangent.x = 0.0f;
+            tangent.y = 0.0f;
+            tangent.z = 0.0f;
+
+            bitangent.x = 0.0f;
+            bitangent.y = 0.0f;
+            bitangent.z = 0.0f;
+        }
+        modeldata.tangents.push_back(tangent);
+        modeldata.bitangents.push_back(bitangent);
+        
+    }
+
+    modeldata.bonesWeights = processBonesWeights(scene, modelRoot, mesh, vertexOffset);
+
+    //-----------SubsMesh----------------
     MeshData meshData;
 
     meshData.name = mesh->mName.C_Str();
 
-    for(unsigned int i = 0; i < mesh->mNumVertices; i++){
-
-        MeshVertexData meshVertex;
-
-        meshVertex.vertex.x = mesh->mVertices[i].x;
-        meshVertex.vertex.y = mesh->mVertices[i].y;
-        meshVertex.vertex.z = mesh->mVertices[i].z;
-
-        if(mesh->HasTextureCoords(0)) {
-            meshVertex.texcoord.x = mesh->mTextureCoords[0][i].x; 
-            meshVertex.texcoord.y = mesh->mTextureCoords[0][i].y;
-        } else {
-            meshVertex.texcoord.x = 0.0f; 
-            meshVertex.texcoord.y = 0.0f;
-        }
-
-        if (mesh->HasNormals()){
-            meshVertex.normal.x = mesh->mNormals[i].x;
-            meshVertex.normal.y = mesh->mNormals[i].y;
-            meshVertex.normal.z = mesh->mNormals[i].z;
-        }else{
-            meshVertex.normal.x = 0.0f;
-            meshVertex.normal.y = 0.0f;
-            meshVertex.normal.z = 0.0f;
-        }
-
-        if (mesh->HasTangentsAndBitangents()){
-            meshVertex.tangent.x = mesh->mTangents[i].x;
-            meshVertex.tangent.y = mesh->mTangents[i].y;
-            meshVertex.tangent.z = mesh->mTangents[i].z;
-
-            meshVertex.bitangent.x = mesh->mBitangents[i].x;
-            meshVertex.bitangent.y = mesh->mBitangents[i].y;
-            meshVertex.bitangent.z = mesh->mBitangents[i].z;
-        }else{
-            meshVertex.tangent.x = 0.0f;
-            meshVertex.tangent.y = 0.0f;
-            meshVertex.tangent.z = 0.0f;
-
-            meshVertex.bitangent.x = 0.0f;
-            meshVertex.bitangent.y = 0.0f;
-            meshVertex.bitangent.z = 0.0f;
-        }
-
-        meshData.meshVertices.push_back(meshVertex);
-        
-    }
-
     for(unsigned int i = 0; i < mesh->mNumFaces; i++){
         aiFace face = mesh->mFaces[i];
         for(unsigned int j = 0; j < face.mNumIndices; j++)
-            meshData.indices.push_back(face.mIndices[j]);
+            meshData.indices.push_back(vertexOffset + face.mIndices[j]);
     }
 
     meshData.materials = processMaterials(material, aiTextureType_DIFFUSE, 1);
-    meshData.bonesWeights = processBonesWeights(scene, modelRoot, mesh);
     
 /*
     std::cout << "aiTextureType_NONE: "         << material->GetTextureCount(aiTextureType_NONE) << std::endl;
@@ -587,10 +533,11 @@ MeshData processMesh(const aiScene *scene, const aiNode* modelRoot, const aiMesh
     std::cout << "aiTextureType_REFLECTION: "   << material->GetTextureCount(aiTextureType_REFLECTION) << std::endl;
     std::cout << "aiTextureType_UNKNOWN: "      << material->GetTextureCount(aiTextureType_UNKNOWN) << std::endl;
 */
+
     return meshData;
 }
 
-std::vector<BoneWeightData> processBonesWeights(const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh){
+std::vector<BoneWeightData> processBonesWeights(const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh, int vertexOffset){
 
     std::vector<BoneWeightData> bonesData;
 
@@ -605,7 +552,7 @@ std::vector<BoneWeightData> processBonesWeights(const aiScene *scene, const aiNo
         for (uint j = 0 ; j < mesh->mBones[i]->mNumWeights ; j++) {
             BoneVertexWeight vertexWeight;
 
-            vertexWeight.vertexId = mesh->mBones[i]->mWeights[j].mVertexId;
+            vertexWeight.vertexId = vertexOffset + mesh->mBones[i]->mWeights[j].mVertexId;
             vertexWeight.weight = mesh->mBones[i]->mWeights[j].mWeight;
 
             boneData.vertexWeights.push_back(vertexWeight);
@@ -643,14 +590,14 @@ bool compareMeshNodeOrParent(const aiNode* node, const aiNode* modelRoot){
 }
 
 
-std::vector<MeshMaterialData> processMaterials(const aiMaterial *mat, aiTextureType assimp_type, int type){
-    std::vector<MeshMaterialData> material;
+std::vector<MaterialData> processMaterials(const aiMaterial *mat, aiTextureType assimp_type, int type){
+    std::vector<MaterialData> material;
 
     for(unsigned int i = 0; i < mat->GetTextureCount(assimp_type); i++){
         aiString str;
         mat->GetTexture(assimp_type, i, &str);
 
-        MeshMaterialData meshMaterial;
+        MaterialData meshMaterial;
         meshMaterial.type = type;
         meshMaterial.texture = str.C_Str();
 
