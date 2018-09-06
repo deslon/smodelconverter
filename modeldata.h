@@ -48,7 +48,7 @@ struct BoneData {
     Vector3 bindPosition;
     Quaternion bindRotation;
     Vector3 bindScale;
-    float** offsetMatrix;
+    float offsetMatrix[4][4];
     std::vector<BoneData> children;
 };
 

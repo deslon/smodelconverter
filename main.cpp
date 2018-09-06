@@ -14,21 +14,6 @@
 #include "modeldata.h"
 #include "readwriteSModel.h"
 
-/*
-void writeMeshVerticesVector(std::ostream& os, const std::vector<MeshVertexData> &vec);
-void writeIndicesVector(std::ostream& os, const std::vector<unsigned int> &vec);
-void writeString(std::ostream& os, const std::string &str);
-void writeMeshMaterialsVector(std::ostream& os, const std::vector<MeshMaterialData> &vec);
-void writeMeshNodesVector(std::ostream& os, const std::vector<MeshData> &vec);
-void writeModelNodesVector(std::ostream& os, const std::vector<ModelData> &vec);
-void writeModelNode(std::ostream& os, const ModelData &modelNode);
-
-void readMeshVerticesVector(std::istream& is, std::vector<MeshVertexData> &vec);
-void readIndicesVector(std::istream& is, std::vector<unsigned int> &vec);
-void readString(std::istream& is, std::string &str);
-void readMeshMaterialsVector(std::istream& is, std::vector<MeshMaterialData> &vec);
-void readMeshNodesVector(std::istream& is, std::vector<MeshData> &vec);
-*/
 std::vector<MeshData> collectModelMeshes(const aiScene *scene, aiNode *node);
 std::string collectModelName(const aiScene *scene, aiNode *node);
 MeshData processMesh(const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh, const aiMaterial* material);
@@ -100,54 +85,22 @@ int main (int argc, char *argv[]){
     os.open("test.smodel", std::ios::out | std::ios::binary);
     writeModel(os, modeldata);
     os.close();
-    
-/*
-    char* readsig= new char[6];
-    int readversion;
-    ModelNodeData modelDataTest;
+
+    printf("\n-----------Model summary---------------\n\n");
+    printModel(modeldata);
+    printf("+++++++++\n");
+
+
+    ModelData modeldataread;
 
     std::ifstream is;
     is.open("test.smodel", std::ios::in | std::ios::binary);
-    is.read(readsig, sizeof(char) * 6);
-    is.read((char*)&readversion, sizeof(int));
-    readMeshNodesVector(is, modelDataTest.meshNodes);
-    is.close();
-*/
-    printf("\n-----------Model summary---------------\n\n");
+    readModel(is, modeldataread);
 
-    printModel(modeldata);
-/*
-    printf("Nodes count: %i\n", (int)modeldata.meshNodes.size());
-    for (int i = 0; i < modeldata.meshNodes.size(); i++){
-        printf("+++++++++\n");
-        printf("Node name: %s\n", modeldata.meshNodes[i].name.c_str());
-        printf("Vertex count: %i\n", (int)modeldata.meshNodes[i].meshVertices.size());
-        if ( modeldata.meshNodes[i].meshVertices.size() > 0)
-            printf("First vertex: x: %f, y: %f, z: %f\n", modeldata.meshNodes[i].meshVertices[0].vertex.x, modeldata.meshNodes[i].meshVertices[0].vertex.y, modeldata.meshNodes[i].meshVertices[0].vertex.z);
-        printf("Index count: %i\n", (int)modeldata.meshNodes[i].indices.size());
-        if ( modeldata.meshNodes[i].materials.size() > 0)
-            printf("Texture: %s\n", modeldata.meshNodes[i].materials[0].texture.c_str());
-    }
-*/    
-    printf("+++++++++\n");
-/*
     printf("\n\n-----------Read test---------------\n\n");
-    printf("Signature: %s\n", readsig);
-    printf("Version: %i\n", readversion);
-
-    printf("Nodes count: %i\n", (int)modelDataTest.meshNodes.size());
-    for (int i = 0; i < modelDataTest.meshNodes.size(); i++){
-        printf("+++++++++\n");
-        printf("Node name: %s\n", modelDataTest.meshNodes[i].name.c_str());
-        printf("Vertex count: %i\n", (int)modelDataTest.meshNodes[i].meshVertices.size());
-        if ( modelDataTest.meshNodes[i].meshVertices.size() > 0)
-            printf("First vertex: x: %f, y: %f, z: %f\n", modelDataTest.meshNodes[i].meshVertices[0].vertex.x, modelDataTest.meshNodes[i].meshVertices[0].vertex.y, modelDataTest.meshNodes[i].meshVertices[0].vertex.z);
-        printf("Index count: %i\n", (int)modelDataTest.meshNodes[i].indices.size());
-        if ( modelDataTest.meshNodes[i].materials.size() > 0)
-            printf("Texture: %s\n", modelDataTest.meshNodes[i].materials[0].texture.c_str());
-    }
+    printModel(modeldataread);
     printf("+++++++++\n");
-*/
+
   return 0;
 }
 void printModel(const ModelData &modelData){
@@ -189,107 +142,6 @@ void printSkeleton(const BoneData &bone, int layerTree){
 
 }
 
-/*
-void writeMeshVerticesVector(std::ostream& os, const std::vector<MeshVertexData> &vec){
-    size_t size = vec.size();
-    os.write((char*)&size, sizeof(size));
-    os.write((char*)&vec[0], vec.size() * sizeof(MeshVertexData));
-}
-
-void writeIndicesVector(std::ostream& os, const std::vector<unsigned int> &vec){
-    size_t size = vec.size();
-    os.write((char*)&size, sizeof(size));
-    os.write((char*)&vec[0], vec.size() * sizeof(unsigned int));
-}
-
-void writeString(std::ostream& os, const std::string &str){
-    size_t size = str.size();
-    os.write((char*)&size, sizeof(size));
-    os.write((char*)&str[0], size);
-}
-
-void writeMeshMaterialsVector(std::ostream& os, const std::vector<MeshMaterialData> &vec){
-    size_t size = vec.size();
-    os.write((char*)&size, sizeof(size));
-
-    for (size_t i = 0; i < size; ++i){
-        os.write((char*)&vec[i].type, sizeof(int));
-        writeString(os, vec[i].texture);
-    }
-}
-
-void writeMeshNodesVector(std::ostream& os, const std::vector<MeshData> &vec){
-    size_t size = vec.size();
-    os.write((char*)&size, sizeof(size));
-
-    for (size_t i = 0; i < size; ++i){
-        writeString(os, vec[i].name);
-        writeMeshVerticesVector(os, vec[i].meshVertices);
-        writeIndicesVector(os, vec[i].indices);
-        writeMeshMaterialsVector(os, vec[i].materials);
-    }
-}
-
-void writeModelNodesVector(std::ostream& os, const std::vector<ModelNodeData> &vec){
-    size_t size = vec.size();
-    os.write((char*)&size, sizeof(size));
-
-    for (size_t i = 0; i < size; ++i){
-        writeModelNode(os, vec[i]);
-    }
-}
-
-void writeModelNode(std::ostream& os, const ModelNodeData &modelNode){
-    writeString(os, modelNode.name);
-    writeMeshNodesVector(os, modelNode.meshes);
-    writeModelNodesVector(os, modelNode.nodes);
-}
-
-void readMeshVerticesVector(std::istream& is, std::vector<MeshVertexData> &vec){
-    size_t size = 0;
-    is.read((char*)&size, sizeof(size));
-    vec.resize(size);
-    is.read((char*)&vec[0], vec.size() * sizeof(MeshVertexData));
-}
-
-void readIndicesVector(std::istream& is, std::vector<unsigned int> &vec){
-    size_t size = 0;
-    is.read((char*)&size, sizeof(size));
-    vec.resize(size);
-    is.read((char*)&vec[0], vec.size() * sizeof(unsigned int));
-}
-
-void readString(std::istream& is, std::string &str){
-    size_t size = 0;
-    is.read((char*)&size, sizeof(size));
-    str.resize(size);
-    is.read((char*)&str[0], size);
-}
-
-void readMeshMaterialsVector(std::istream& is, std::vector<MeshMaterialData> &vec){
-    size_t size = 0;
-    is.read((char*)&size, sizeof(size));
-    vec.resize(size);
-
-    for (size_t i = 0; i < size; ++i){
-        is.read((char*)&vec[i].type, sizeof(int));
-        readString(is, vec[i].texture);
-    }
-}
-
-void readMeshNodesVector(std::istream& is, std::vector<MeshData> &vec){
-    size_t size = 0;
-    is.read((char*)&size, sizeof(size));
-    vec.resize(size);
-
-    for (size_t i = 0; i < size; ++i){
-        readString(is, vec[i].name);
-        readMeshVerticesVector(is, vec[i].meshVertices);
-        readIndicesVector(is, vec[i].indices);
-        readMeshMaterialsVector(is, vec[i].materials);
-    }
-}
-*/
 std::string collectModelName(const aiScene *scene, aiNode *node){
 
     if (node->mNumMeshes > 0){
@@ -410,7 +262,12 @@ BoneData* collectBones(const aiScene *scene, const aiNode *node){
 
         boneData->name = node->mName.C_Str();
 
-        boneData->offsetMatrix = getOffsetMatrix(scene, node->mName);
+        float** resultOffsetMatrix = getOffsetMatrix(scene, node->mName);
+        for (int i = 0; i < 4; i++){
+            for (int j = 0; j < 4; j++){
+                boneData->offsetMatrix[i][j] = resultOffsetMatrix[i][j];
+            }
+        }
 
         for(unsigned int i = 0; i < node->mNumChildren; i++){
             if (node->mChildren[i]->mNumMeshes == 0)
