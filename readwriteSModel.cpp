@@ -15,7 +15,7 @@ void writeModel(std::ostream& os, const ModelData &modelData){
     writeVector3Vector(os, modelData.tangents);
     writeVector3Vector(os, modelData.bitangents);
     writeMeshDataVector(os, modelData.meshes);
-    writeBoneWeightDataVector(os, modelData.bonesWeights);
+    writeBoneWeightDataVector(os, modelData.boneWeights);
     writeSkeleton(os, modelData.skeleton);
 }
 
@@ -79,11 +79,11 @@ void writeBoneWeightDataVector(std::ostream& os, const std::vector<BoneWeightDat
 
     for (size_t i = 0; i < size; ++i){
         writeString(os, vec[i].name);
-        writeBoneVertexWeightVector(os, vec[i].vertexWeights);
+        writeBoneVertexWeightDataVector(os, vec[i].vertexWeights);
     }
 }
 
-void writeBoneVertexWeightVector(std::ostream& os, const std::vector<BoneVertexWeight> &vec){
+void writeBoneVertexWeightDataVector(std::ostream& os, const std::vector<BoneVertexWeightData> &vec){
     size_t size = vec.size();
     os.write((char*)&size, sizeof(size));
 
@@ -123,7 +123,7 @@ void writeBoneData(std::ostream& os, const BoneData &boneData){
 
 //---------------------- READ FUNCTIONS ------------------------------
 
-void readModel(std::istream& is, ModelData &modelData){
+bool readModel(std::istream& is, ModelData &modelData){
     char* sig= new char[6];
     int version;
 
@@ -138,9 +138,13 @@ void readModel(std::istream& is, ModelData &modelData){
         readVector3Vector(is, modelData.tangents);
         readVector3Vector(is, modelData.bitangents);
         readMeshDataVector(is, modelData.meshes);
-        readBoneWeightDataVector(is, modelData.bonesWeights);
+        readBoneWeightDataVector(is, modelData.boneWeights);
         readSkeleton(is, modelData.skeleton);
+
+        return true;
     }
+
+    return false;
 }
 
 void readString(std::istream& is, std::string &str){
@@ -211,11 +215,11 @@ void readBoneWeightDataVector(std::istream& is, std::vector<BoneWeightData> &vec
 
     for (size_t i = 0; i < size; ++i){
         readString(is, vec[i].name);
-        readBoneVertexWeightVector(is, vec[i].vertexWeights);
+        readBoneVertexWeightDataVector(is, vec[i].vertexWeights);
     }
 }
 
-void readBoneVertexWeightVector(std::istream& is, std::vector<BoneVertexWeight> &vec){
+void readBoneVertexWeightDataVector(std::istream& is, std::vector<BoneVertexWeightData> &vec){
     size_t size = 0;
     is.read((char*)&size, sizeof(size));
     vec.resize(size);

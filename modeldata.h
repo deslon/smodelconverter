@@ -27,14 +27,14 @@ struct MaterialData {
     std::string texture;
 };
 
-struct BoneVertexWeight{
+struct BoneVertexWeightData{
     unsigned int vertexId;
     float weight;
 };
 
 struct BoneWeightData {
     std::string name;
-    std::vector<BoneVertexWeight> vertexWeights;
+    std::vector<BoneVertexWeightData> vertexWeights;
 };
 
 struct MeshData {
@@ -60,7 +60,7 @@ struct ModelData {
     std::vector<Vector3> tangents;
     std::vector<Vector3> bitangents;
     std::vector<MeshData> meshes;
-    std::vector<BoneWeightData> bonesWeights;
+    std::vector<BoneWeightData> boneWeights;
     BoneData* skeleton;
 };
 

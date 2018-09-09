@@ -18,7 +18,7 @@ std::vector<MeshData> collectModelMeshes(const aiScene *scene, aiNode *node);
 std::string collectModelName(const aiScene *scene, aiNode *node);
 MeshData processMesh(const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh, const aiMaterial* material);
 BoneData* collectBones(const aiScene *scene, const aiNode *node);
-std::vector<BoneWeightData> processBonesWeights(const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh, int vertexOffset);
+std::vector<BoneWeightData> processBoneWeights(const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh, int vertexOffset);
 std::vector<MaterialData> processMaterials(const aiMaterial *mat, aiTextureType assimp_type, int type);
 void selectNecessaryNodes(aiNode* node, const aiNode* modelRoot);
 bool compareMeshNodeOrParent(const aiNode* node, const aiNode* modelRoot);
@@ -105,7 +105,7 @@ int main (int argc, char *argv[]){
 }
 void printModel(const ModelData &modelData){
 
-    printf("Model name: %s, vertices: %i, bone weights: %i\n", modelData.name.c_str(), (int)modelData.vertices.size(), (int)modelData.bonesWeights.size());
+    printf("Model name: %s, vertices: %i, bone weights: %i\n", modelData.name.c_str(), (int)modelData.vertices.size(), (int)modelData.boneWeights.size());
 
         for (int i = 0; i < modelData.meshes.size(); i++){
             printf(">Mesh (%s), indices: %i\n", 
@@ -361,7 +361,7 @@ MeshData processMesh(const aiScene *scene, const aiNode* modelRoot, const aiMesh
         
     }
 
-    modeldata.bonesWeights = processBonesWeights(scene, modelRoot, mesh, vertexOffset);
+    modeldata.boneWeights = processBoneWeights(scene, modelRoot, mesh, vertexOffset);
 
     //-----------SubsMesh----------------
     MeshData meshData;
@@ -394,7 +394,7 @@ MeshData processMesh(const aiScene *scene, const aiNode* modelRoot, const aiMesh
     return meshData;
 }
 
-std::vector<BoneWeightData> processBonesWeights(const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh, int vertexOffset){
+std::vector<BoneWeightData> processBoneWeights(const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh, int vertexOffset){
 
     std::vector<BoneWeightData> bonesData;
 
@@ -407,7 +407,7 @@ std::vector<BoneWeightData> processBonesWeights(const aiScene *scene, const aiNo
         boneData.name = mesh->mBones[i]->mName.C_Str();
 
         for (uint j = 0 ; j < mesh->mBones[i]->mNumWeights ; j++) {
-            BoneVertexWeight vertexWeight;
+            BoneVertexWeightData vertexWeight;
 
             vertexWeight.vertexId = vertexOffset + mesh->mBones[i]->mWeights[j].mVertexId;
             vertexWeight.weight = mesh->mBones[i]->mWeights[j].mWeight;
