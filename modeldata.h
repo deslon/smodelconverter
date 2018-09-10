@@ -5,10 +5,10 @@
 #include <string>
 
 struct Quaternion {
+    float w;
     float x;
     float y;
     float z;
-    float w;
 };
 
 struct Vector3 {

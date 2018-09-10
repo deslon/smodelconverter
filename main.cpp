@@ -134,7 +134,7 @@ void printSkeleton(const BoneData &bone, int layerTree){
     printf("%s  Scale: %f %f %f\n", strtree.c_str(), bone.bindScale.x, bone.bindScale.y, bone.bindScale.z);
     printf("%s  Offset:\n", strtree.c_str());
     for (unsigned int i = 0; i < 4; i++)
-        printf("%s    %f %f %f %f\n", strtree.c_str(), bone.offsetMatrix[i][0], bone.offsetMatrix[i][1], bone.offsetMatrix[i][2], bone.offsetMatrix[i][3]);
+        printf("%s    %f %f %f %f\n", strtree.c_str(), bone.offsetMatrix[0][i], bone.offsetMatrix[1][i], bone.offsetMatrix[2][i], bone.offsetMatrix[3][i]);
 
     for (int i = 0; i < bone.children.size(); i++){
         printSkeleton(bone.children[i], layerTree+1);
@@ -180,7 +180,8 @@ float** convertAssimpMatrix4(const aiMatrix4x4 matrix){
     for (int i = 0; i < 4; i++){
         convMatrix[i] = new float[4];
         for (int j = 0; j < 4; j++){
-            convMatrix[i][j] = matrix[i][j];
+            //Convert row-major to collumn-major
+            convMatrix[i][j] = matrix[j][i];
         }
     }
 
@@ -251,10 +252,10 @@ BoneData* collectBones(const aiScene *scene, const aiNode *node){
         boneData->bindPosition.y = aiPos.y;
         boneData->bindPosition.z = aiPos.z;
 
+        boneData->bindRotation.w = aiRot.w;
         boneData->bindRotation.x = aiRot.x;
         boneData->bindRotation.y = aiRot.y;
         boneData->bindRotation.z = aiRot.z;
-        boneData->bindRotation.w = aiRot.w;
 
         boneData->bindScale.x = aiScale.x;
         boneData->bindScale.y = aiScale.y;
