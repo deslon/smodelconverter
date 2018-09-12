@@ -11,8 +11,9 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
-#include "modeldata.h"
-#include "readwriteSModel.h"
+#include "SModelData.h"
+#include "WriteSModel.h"
+#include "ReadSModel.h"
 
 std::vector<MeshData> collectModelMeshes(const aiScene *scene, aiNode *node);
 std::string collectModelName(const aiScene *scene, aiNode *node);
@@ -27,11 +28,11 @@ aiMatrix4x4 getDerivedTransform(const aiNode* node, const aiNode* sceneRoot);
 aiMatrix4x4 getInverseDerivedTransform(const aiNode* node, const aiNode* sceneRoot);
 float** convertAssimpMatrix4(const aiMatrix4x4 matrix);
 
-void printModel(const ModelData &modelNode);
+void printModel(const SModelData &modelNode);
 void printSkeleton(const BoneData &bone, int layerTree = 0);
 
 
-ModelData modeldata;
+SModelData modeldata;
 
 aiNode* sceneRoot = NULL;
 aiNode* modelRoot = NULL;
@@ -82,28 +83,31 @@ int main (int argc, char *argv[]){
     modeldata.skeleton = collectBones(scene, boneRoot);
 
     std::ofstream os;
+    WriteSModel writeSmodel(&os);
+
     os.open("test.smodel", std::ios::out | std::ios::binary);
-    writeModel(os, modeldata);
+    writeSmodel.writeModel(modeldata);
     os.close();
 
     printf("\n-----------Model summary---------------\n\n");
     printModel(modeldata);
-    printf("+++++++++\n");
+    printf("\n+++++++++\n");
 
-
-    ModelData modeldataread;
 
     std::ifstream is;
+    ReadSModel readSmodel(&is);
+    SModelData modeldataread;
+
     is.open("test.smodel", std::ios::in | std::ios::binary);
-    readModel(is, modeldataread);
+    readSmodel.readModel(modeldataread);
 
     printf("\n\n-----------Read test---------------\n\n");
     printModel(modeldataread);
-    printf("+++++++++\n");
+    printf("\n+++++++++\n");
 
   return 0;
 }
-void printModel(const ModelData &modelData){
+void printModel(const SModelData &modelData){
 
     printf("Model name: %s, vertices: %i, bone weights: %i\n", modelData.name.c_str(), (int)modelData.vertices.size(), (int)modelData.boneWeights.size());
 
@@ -180,7 +184,7 @@ float** convertAssimpMatrix4(const aiMatrix4x4 matrix){
     for (int i = 0; i < 4; i++){
         convMatrix[i] = new float[4];
         for (int j = 0; j < 4; j++){
-            //Convert row-major to collumn-major
+            //Convert row-major to column-major
             convMatrix[i][j] = matrix[j][i];
         }
     }

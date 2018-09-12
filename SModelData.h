@@ -1,5 +1,5 @@
-#ifndef modeldata_h
-#define modeldata_h
+#ifndef SMODELDATA_H
+#define SMODELDATA_H
 
 #include <vector>
 #include <string>
@@ -52,7 +52,7 @@ struct BoneData {
     std::vector<BoneData> children;
 };
 
-struct ModelData {
+struct SModelData {
     std::string name;
     std::vector<Vector3> vertices;
     std::vector<std::vector<Vector2>> texcoords;
@@ -64,4 +64,4 @@ struct ModelData {
     BoneData* skeleton;
 };
 
-#endif /* modeldata_h */
+#endif /* SMODELDATA_H */
