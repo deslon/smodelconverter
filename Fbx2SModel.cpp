@@ -16,9 +16,110 @@
 #include "util/File_Utils.hpp"
 #include "util/String_Utils.hpp"
 
+struct RawNode
+{
+    bool                     isJoint;
+    long                     id;
+    std::string              name;
+    long                     parentId;
+    std::vector<long>        childIds;
+    FbxVector4               translation;
+    FbxQuaternion            rotation;
+    FbxVector4               scale;
+    long                     surfaceId;
+};
+
+struct RawBlendChannel
+{
+    float defaultDeform;
+    bool hasNormals;
+    bool hasTangents;
+    std::string name;
+};
+
+struct RawSurface
+{
+    long                         id;
+    std::string                  name;                            // The name of this surface
+    long                         skeletonRootId;                  // The id of the root node of the skeleton.
+    //Bounds<float, 3>             bounds;
+    std::vector<long>            jointIds;
+    //std::vector<Vec3f>           jointGeometryMins;
+    //std::vector<Vec3f>           jointGeometryMaxs;
+    std::vector<FbxAMatrix>           inverseBindMatrices;
+    std::vector<RawBlendChannel> blendChannels;
+    bool                         discrete;
+};
+
 
 bool verboseOutput = true;
 float scaleFactor = 1;
+long rootNodeId;
+std::vector<RawSurface> surfaces;
+std::vector<RawNode> nodes;
+
+int AddNode(const long id, const char *name, const long parentId)
+{
+    assert(name[0] != '\0');
+
+    for (size_t i = 0; i < nodes.size(); i++) {
+        if (nodes[i].id == id ) {
+            return (int) i;
+        }
+    }
+
+    RawNode joint;
+    joint.isJoint     = false;
+    joint.id          = id;
+    joint.name        = name;
+    joint.parentId    = parentId;
+    joint.surfaceId   = 0;
+    joint.translation = FbxVector4(0, 0, 0, 1);
+    joint.rotation    = FbxQuaternion(0, 0, 0, 1);
+    joint.scale       = FbxVector4(1, 1, 1, 1);
+
+    nodes.emplace_back(joint);
+    return (int) nodes.size() - 1;
+}
+
+int GetNodeById(const long nodeId)
+{
+    for (size_t i = 0; i < nodes.size(); i++) {
+        if (nodes[i].id == nodeId) {
+            return (int) i;
+        }
+    }
+    return -1;
+}
+
+int AddSurface(const char *name, const long surfaceId)
+{
+    assert(name[0] != '\0');
+
+    for (size_t i = 0; i < surfaces.size(); i++) {
+        if (surfaces[i].id == surfaceId) {
+            return (int) i;
+        }
+    }
+    RawSurface  surface;
+    surface.id = surfaceId;
+    surface.name     = name;
+    //surface.bounds.Clear();
+    surface.discrete  = false;
+
+    surfaces.emplace_back(surface);
+    return (int) (surfaces.size() - 1);
+}
+
+int GetSurfaceById(const long surfaceId)
+{
+    for (size_t i = 0; i < surfaces.size(); i++) {
+        if (surfaces[i].id == surfaceId) {
+            return (int)i;
+        }
+    }
+    return -1;
+}
 
 static void ReadMesh(SModelData &modeldata, FbxScene *pScene, FbxNode *pNode, const std::map<const FbxTexture *, FbxString> &textureLocations){
 
@@ -28,21 +129,21 @@ static void ReadMesh(SModelData &modeldata, FbxScene *pScene, FbxNode *pNode, co
 
     // Obtains the surface Id
     const long surfaceId = pMesh->GetUniqueID();
-/*
+
     // Associate the node to this surface
-    int nodeId = raw.GetNodeById(pNode->GetUniqueID());
+    int nodeId = GetNodeById(pNode->GetUniqueID());
     if (nodeId >= 0) {
-        RawNode &node = raw.GetNode(nodeId);
+        RawNode &node = nodes[nodeId];
         node.surfaceId = surfaceId;
     }
 
-    if (raw.GetSurfaceById(surfaceId) >= 0) {
+    if (GetSurfaceById(surfaceId) >= 0) {
         // This surface is already loaded
         return;
     }
-*/
+
     const char *meshName = (pNode->GetName()[0] != '\0') ? pNode->GetName() : pMesh->GetName();
-    //const int rawSurfaceIndex = raw.AddSurface(meshName, surfaceId);
+    const int rawSurfaceIndex = AddSurface(meshName, surfaceId);
 
     const FbxVector4 *controlPoints = pMesh->GetControlPoints();
     const FbxLayerElementAccess<FbxVector4> normalLayer(pMesh->GetElementNormal(), pMesh->GetElementNormalCount());
@@ -54,19 +155,18 @@ static void ReadMesh(SModelData &modeldata, FbxScene *pScene, FbxNode *pNode, co
     const FbxSkinningAccess                 skinning(pMesh, pScene, pNode);
     const FbxMaterialsAccess                materials(pMesh, textureLocations);
     const FbxBlendShapesAccess              blendShapes(pMesh);
-/*
+
     if (verboseOutput) {
         printf(
             "mesh %d: %s (skinned: %s)\n", rawSurfaceIndex, meshName,
-            skinning.IsSkinned() ? raw.GetNode(raw.GetNodeById(skinning.GetRootNode())).name.c_str() : "NO");
+            skinning.IsSkinned() ? nodes[GetNodeById(skinning.GetRootNode())].name.c_str() : "NO");
     }
-*/
+
     // The FbxNode geometric transformation describes how a FbxNodeAttribute is offset from
     // the FbxNode's local frame of reference. These geometric transforms are applied to the
     // FbxNodeAttribute after the FbxNode's local transforms are computed, and are not
     // inherited across the node hierarchy.
-    // Apply the geometric transform to the mesh geometry (vertices, normal etc.) because
-    // glTF does not have an equivalent to the geometric transform.
+    // Apply the geometric transform to the mesh geometry (vertices, normal etc.).
     const FbxVector4 meshTranslation           = pNode->GetGeometricTranslation(FbxNode::eSourcePivot);
     const FbxVector4 meshRotation              = pNode->GetGeometricRotation(FbxNode::eSourcePivot);
     const FbxVector4 meshScaling               = pNode->GetGeometricScaling(FbxNode::eSourcePivot);
@@ -88,23 +188,24 @@ static void ReadMesh(SModelData &modeldata, FbxScene *pScene, FbxNode *pNode, co
         raw.AddVertexAttribute(RAW_VERTEX_ATTRIBUTE_JOINT_WEIGHTS);
         raw.AddVertexAttribute(RAW_VERTEX_ATTRIBUTE_JOINT_INDICES);
     }
+*/
+    RawSurface &rawSurface = surfaces[rawSurfaceIndex];
 
-    RawSurface &rawSurface = raw.GetSurface(rawSurfaceIndex);
-    
-    Mat4f scaleMatrix = Mat4f::FromScaleVector(Vec3f(scaleFactor, scaleFactor, scaleFactor));
-    Mat4f invScaleMatrix = scaleMatrix.Inverse();
+    FbxAMatrix scaleMatrix;
+    scaleMatrix.SetS(FbxVector4(scaleFactor, scaleFactor, scaleFactor, 1.0));
+    FbxAMatrix invScaleMatrix = scaleMatrix.Inverse();
 
     rawSurface.skeletonRootId = (skinning.IsSkinned()) ? skinning.GetRootNode() : pNode->GetUniqueID();
     for (int jointIndex = 0; jointIndex < skinning.GetNodeCount(); jointIndex++) {
         const long jointId = skinning.GetJointId(jointIndex);
-        raw.GetNode(raw.GetNodeById(jointId)).isJoint = true;
+        nodes[GetNodeById(jointId)].isJoint = true;
 
         rawSurface.jointIds.emplace_back(jointId);
-        rawSurface.inverseBindMatrices.push_back(invScaleMatrix * toMat4f(skinning.GetInverseBindMatrix(jointIndex)) * scaleMatrix);
-        rawSurface.jointGeometryMins.emplace_back(FLT_MAX, FLT_MAX, FLT_MAX);
-        rawSurface.jointGeometryMaxs.emplace_back(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+        rawSurface.inverseBindMatrices.push_back(invScaleMatrix * skinning.GetInverseBindMatrix(jointIndex) * scaleMatrix);
+        //rawSurface.jointGeometryMins.emplace_back(FLT_MAX, FLT_MAX, FLT_MAX);
+        //rawSurface.jointGeometryMaxs.emplace_back(-FLT_MAX, -FLT_MAX, -FLT_MAX);
     }
-
+/*
     rawSurface.blendChannels.clear();
     std::vector<const FbxBlendShapesAccess::TargetShape *> targetShapes;
     for (size_t channelIx = 0; channelIx < blendShapes.GetChannelCount(); channelIx ++) {
@@ -457,8 +558,8 @@ static void ReadNodeHierarchy(FbxScene *pScene, FbxNode *pNode, const long paren
 
     const FbxUInt64 nodeId = pNode->GetUniqueID();
     const char *nodeName = pNode->GetName();
-    // const int  nodeIndex = raw.AddNode(nodeId, nodeName, parentId);
-    // RawNode    &node     = raw.GetNode(nodeIndex);
+    const int  nodeIndex = AddNode(nodeId, nodeName, parentId);
+    RawNode    &node     = nodes[nodeIndex];
 
     FbxTransform::EInheritType lInheritType;
     pNode->GetTransformationInheritType(lInheritType);
@@ -468,7 +569,6 @@ static void ReadNodeHierarchy(FbxScene *pScene, FbxNode *pNode, const long paren
         printf("node: %s\n", newPath.c_str());
     }
 
-/*
     static int warnRrSsCount = 0;
     static int warnRrsCount  = 0;
     if (lInheritType == FbxTransform::eInheritRrSs && parentId) {
@@ -481,34 +581,34 @@ static void ReadNodeHierarchy(FbxScene *pScene, FbxNode *pNode, const long paren
         if (++warnRrsCount == 1) {
             printf(
                 "Warning: node %s uses unsupported transform inheritance type 'eInheritRrs'\n"
-                    "     This tool will attempt to partially compensate, but glTF cannot truly express this mode.\n"
+                    "     This tool will attempt to partially compensate.\n"
                     "     If this was a Maya export, consider turning off 'Segment Scale Compensate' on all joints.\n"
                     "     (Further warnings of this type squelched.)\n",
                 newPath.c_str());
         }
     }
-*/
+
     // Set the initial node transform.
     const FbxAMatrix    localTransform   = pNode->EvaluateLocalTransform();
     const FbxVector4    localTranslation = localTransform.GetT();
     const FbxQuaternion localRotation    = localTransform.GetQ();
     const FbxVector4    localScaling     = computeLocalScale(pNode);
 
-   // node.translation = toVec3f(localTranslation) * scaleFactor;
-   // node.rotation    = toQuatf(localRotation);
-   // node.scale       = toVec3f(localScaling);
-/*
+    node.translation = localTranslation * scaleFactor;
+    node.rotation    = localRotation;
+    node.scale       = localScaling;
+
     if (parentId) {
-        RawNode &parentNode = raw.GetNode(raw.GetNodeById(parentId));
+        RawNode &parentNode = nodes[GetNodeById(parentId)];
         // Add unique child name to the parent node.
         if (std::find(parentNode.childIds.begin(), parentNode.childIds.end(), nodeId) == parentNode.childIds.end()) {
             parentNode.childIds.push_back(nodeId);
         }
     } else {
         // If there is no parent then this is the root node.
-        raw.SetRootNode(nodeId);
+        rootNodeId = nodeId;
     }
-*/
+
     for (int child = 0; child < pNode->GetChildCount(); child++) {
         ReadNodeHierarchy(pScene, pNode->GetChild(child), nodeId, newPath);
     }
@@ -559,7 +659,7 @@ bool convertFbx2SModel(SModelData &modeldata, std::string path){
     // this is always 0.01, but let's opt for clarity.
     scaleFactor = FbxSystemUnit::m.GetConversionFactorFrom(FbxSystemUnit::cm);
 
-    //ReadNodeHierarchy(pScene, pScene->GetRootNode(), 0, "");
+    ReadNodeHierarchy(pScene, pScene->GetRootNode(), 0, "");
     ReadNodeAttributes(modeldata, pScene, pScene->GetRootNode(), textureLocations);
     //ReadAnimations(raw, pScene);
 
