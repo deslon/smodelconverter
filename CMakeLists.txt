@@ -13,6 +13,8 @@ set(ASSIMP_BUILD_TESTS OFF)
 include_directories ("${PROJECT_SOURCE_DIR}/ThirdParty/assimp-4.1.0/include")
 add_subdirectory (ThirdParty/assimp-4.1.0) 
 
+include_directories ("${PROJECT_SOURCE_DIR}/ThirdParty/stb")
+
 # FBX
 foreach (FBXSDK_VERSION "2019.0" "2018.1.1")
   find_package(FBX)
@@ -35,19 +37,23 @@ add_executable(smodelconverter
   Fbx2SModel.cpp
   WriteSModel.cpp
   ReadSModel.cpp
+  util/Fbx2Raw.cpp
   util/FbxBlendShapesAccess.cpp
   util/FbxMaterialsAccess.cpp
   util/FbxSkinningAccess.cpp
   util/FbxTraditionalMaterialInfo.cpp
   util/FbxRoughMetMaterialInfo.cpp
+  util/RawModel.cpp
   util/File_Utils.cpp
-  util/String_Utils.cpp)
+  util/String_Utils.cpp
+  util/Image_Utils.cpp)
 
 target_link_libraries (smodelconverter 
   assimp
   optimized ${FBXSDK_LIBRARY}
   debug ${FBXSDK_LIBRARY_DEBUG}
   ${CMAKE_DL_LIBS}
+  ${CMAKE_THREAD_LIBS_INIT}
   )
 
 target_include_directories(smodelconverter PUBLIC

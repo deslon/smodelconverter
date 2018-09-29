@@ -25,3 +25,7 @@ Makefile
 code/Makefile
 test/Makefile
 test/headercheck/Makefile
+
+# Assimp
+DartConfiguration.tcl
+CTestTestfile.cmake
