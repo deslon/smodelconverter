@@ -23,6 +23,33 @@
 #include <vector>
 #include <fbxsdk.h>
 
+template<class T, int d>
+struct Bounds
+{
+    T min;
+    T max;
+    bool initialized = false;
+
+    void Clear() {
+        min = T();
+        max = T();
+        initialized = false;
+    }
+
+    void AddPoint(const T &p) {
+        if (initialized) {
+            for (int ii = 0; ii < d; ii ++) {
+                min[ii] = std::min(min[ii], p[ii]);
+                max[ii] = std::max(max[ii], p[ii]);
+            }
+        } else {
+            min = p;
+            max = p;
+            initialized = true;
+        }
+    }
+};
+
 /**
  * The variuos situations in which the user may wish for us to (re-)compute normals for our vertices.
  */
@@ -346,10 +373,10 @@ struct RawSurface
     long                         id;
     std::string                  name;                            // The name of this surface
     long                         skeletonRootId;                  // The id of the root node of the skeleton.
-    //Bounds<float, 3>             bounds;
+    Bounds<FbxVector4, 4>        bounds;
     std::vector<long>            jointIds;
-    //std::vector<Vec3f>           jointGeometryMins;
-    //std::vector<Vec3f>           jointGeometryMaxs;
+    std::vector<FbxVector4>      jointGeometryMins;
+    std::vector<FbxVector4>      jointGeometryMaxs;
     std::vector<FbxAMatrix>      inverseBindMatrices;
     std::vector<RawBlendChannel> blendChannels;
     bool                         discrete;

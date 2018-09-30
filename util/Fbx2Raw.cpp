@@ -151,8 +151,8 @@ static void ReadMesh(RawModel &raw, FbxScene *pScene, FbxNode *pNode, const std:
 
         rawSurface.jointIds.emplace_back(jointId);
         rawSurface.inverseBindMatrices.push_back(invScaleMatrix * skinning.GetInverseBindMatrix(jointIndex) * scaleMatrix);
-        //rawSurface.jointGeometryMins.emplace_back(FLT_MAX, FLT_MAX, FLT_MAX);
-        //rawSurface.jointGeometryMaxs.emplace_back(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+        rawSurface.jointGeometryMins.emplace_back(FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX);
+        rawSurface.jointGeometryMaxs.emplace_back(-FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX);
     }
 
     rawSurface.blendChannels.clear();
@@ -284,7 +284,7 @@ static void ReadMesh(RawModel &raw, FbxScene *pScene, FbxNode *pNode, const std:
             // flag this triangle as transparent if any of its corner vertices substantially deviates from fully opaque
             vertexTransparency |= colorLayer.LayerPresent() && (fabs(fbxColor.mAlpha - 1.0) > 1e-3);
 
-            //rawSurface.bounds.AddPoint(vertex.position);
+            rawSurface.bounds.AddPoint(vertex.position);
 
             if (!targetShapes.empty()) {
                 vertex.blendSurfaceIx = rawSurfaceIndex;
@@ -329,24 +329,26 @@ static void ReadMesh(RawModel &raw, FbxScene *pScene, FbxNode *pNode, const std:
                     skinning.GetJointSkinningTransform(jointIndices[3]) * jointWeights[3];
 
                 const FbxVector4 globalPosition = skinningMatrix.MultNormalize(fbxPosition);
-                /*
+                
                 for (int i = 0; i < FbxSkinningAccess::MAX_WEIGHTS; i++) {
                     if (jointWeights[i] > 0.0f) {
                         const FbxVector4 localPosition =
                             skinning.GetJointInverseGlobalTransforms(jointIndices[i]).MultNormalize(globalPosition);
 
-                        Vec3f &mins = rawSurface.jointGeometryMins[jointIndices[i]];
-                        mins[0] = std::min(mins[0], (float) localPosition[0]);
-                        mins[1] = std::min(mins[1], (float) localPosition[1]);
-                        mins[2] = std::min(mins[2], (float) localPosition[2]);
+                        FbxVector4 &mins = rawSurface.jointGeometryMins[jointIndices[i]];
+                        mins[0] = std::min(mins[0], localPosition[0]);
+                        mins[1] = std::min(mins[1], localPosition[1]);
+                        mins[2] = std::min(mins[2], localPosition[2]);
+                        mins[3] = std::min(mins[3], localPosition[3]);
 
-                        Vec3f &maxs = rawSurface.jointGeometryMaxs[jointIndices[i]];
-                        maxs[0] = std::max(maxs[0], (float) localPosition[0]);
-                        maxs[1] = std::max(maxs[1], (float) localPosition[1]);
-                        maxs[2] = std::max(maxs[2], (float) localPosition[2]);
+                        FbxVector4 &maxs = rawSurface.jointGeometryMaxs[jointIndices[i]];
+                        maxs[0] = std::max(maxs[0], localPosition[0]);
+                        maxs[1] = std::max(maxs[1], localPosition[1]);
+                        maxs[2] = std::max(maxs[2], localPosition[2]);
+                        maxs[3] = std::max(maxs[3], localPosition[3]);
                     }
                 }
-                */
+                
             }
         }
 

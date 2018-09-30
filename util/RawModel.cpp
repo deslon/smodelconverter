@@ -183,7 +183,7 @@ int RawModel::AddSurface(const char *name, const long surfaceId)
     RawSurface  surface;
     surface.id = surfaceId;
     surface.name     = name;
-    //surface.bounds.Clear();
+    surface.bounds.Clear();
     surface.discrete  = false;
 
     surfaces.emplace_back(surface);
@@ -505,7 +505,7 @@ void RawModel::CreateMaterialModels(
                 assert(nodeIndex != -1);
                 model->AddNode(GetNode(nodeIndex));
             }
-            //rawSurface.bounds.Clear();
+            rawSurface.bounds.Clear();
         }
 
         int verts[3];
@@ -552,7 +552,7 @@ void RawModel::CreateMaterialModels(
             verts[j] = model->AddVertex(vertex);
             model->vertexAttributes |= vertex.Difference(defaultVertex);
 
-            //rawSurface.bounds.AddPoint(vertex.position);
+            rawSurface.bounds.AddPoint(vertex.position);
         }
 
         model->AddTriangle(verts[0], verts[1], verts[2], materialIndex, surfaceIndex);
