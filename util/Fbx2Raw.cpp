@@ -34,9 +34,9 @@
 #include "FbxMaterialsAccess.hpp"
 #include "FbxSkinningAccess.hpp"
 
-bool verboseOutput = true;
+bool verboseOutput = false;
 
-float scaleFactor;
+float scaleFactor = 1.0;
 
 static bool TriangleTexturePolarity(const FbxVector2 &uv0, const FbxVector2 &uv1, const FbxVector2 &uv2)
 {
@@ -714,6 +714,10 @@ static std::string GetInferredFileName(const std::string &fbxFileName, const std
     // Get the file name with file extension.
     const std::string fileName = StringUtils::GetFileNameString(StringUtils::GetCleanPathString(fbxFileName));
 
+    if (FileUtils::FileExists(fileName)) {
+        return fileName;
+    }
+
     // Try to find a match with extension.
     for (const auto &file : directoryFileList) {
         if (StringUtils::CompareNoCase(fileName, file) == 0) {
@@ -820,7 +824,7 @@ bool LoadFBXFile(RawModel &raw, const char *fbxFileName, const char *textureExte
         FbxSystemUnit::cm.ConvertScene(pScene);
     }
     // this is always 0.01, but let's opt for clarity.
-    scaleFactor = FbxSystemUnit::m.GetConversionFactorFrom(FbxSystemUnit::cm);
+    //scaleFactor = FbxSystemUnit::m.GetConversionFactorFrom(FbxSystemUnit::cm);
 
     ReadNodeHierarchy(raw, pScene, pScene->GetRootNode(), 0, "");
     ReadNodeAttributes(raw, pScene, pScene->GetRootNode(), textureLocations);

@@ -32,7 +32,7 @@ int main (int argc, char *argv[]){
     if (!convertAssimp2SModel(modeldata, path)){
         return 1;
     }
-
+*/
     std::ofstream os;
     WriteSModel writeSmodel(&os);
 
@@ -43,7 +43,7 @@ int main (int argc, char *argv[]){
     printf("\n-----------Model summary---------------\n\n");
     printModel(modeldata);
     printf("\n+++++++++\n");
-
+/*
 
     std::ifstream is;
     ReadSModel readSmodel(&is);
@@ -66,6 +66,10 @@ void printModel(const SModelData &modelData){
             printf(">Mesh (%s), indices: %i\n", 
                 modelData.meshes[i].name.c_str(), 
                 (int)modelData.meshes[i].indices.size());
+
+            if (modelData.meshes[i].materials.size() > 0){
+                printf("  >>Texture: %s\n", modelData.meshes[i].materials[0].texture.c_str());
+            }
 /*
             for (int b = 0; b < modelData.meshes[i].bones.size(); b++){
                 printf(">>Bone (%s), weights: %i\n", 
