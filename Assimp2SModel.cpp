@@ -116,7 +116,7 @@ aiMatrix4x4 getInverseDerivedTransform(const aiNode* node, const aiNode* sceneRo
     aiMatrix4x4 nodeDerivedInverse;
 
     if (modelRoot != sceneRoot)
-        nodeDerivedInverse = getDerivedTransform(modelRoot, sceneRoot);
+        nodeDerivedInverse = getDerivedTransform(node, sceneRoot);
     nodeDerivedInverse.Inverse();
 
     return nodeDerivedInverse;

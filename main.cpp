@@ -27,12 +27,14 @@ int main (int argc, char *argv[]){
 
     std::string path = argv[1];
 
-    convertFbx2SModel(modeldata, path);
-/*
-    if (!convertAssimp2SModel(modeldata, path)){
+    if (!convertFbx2SModel(modeldata, path)){
         return 1;
     }
-*/
+
+    //if (!convertAssimp2SModel(modeldata, path)){
+    //    return 1;
+    //}
+
     std::ofstream os;
     WriteSModel writeSmodel(&os);
 

@@ -7,11 +7,7 @@
 #include <map>
 
 void collectName(SModelData &modeldata, RawModel &raw){
-    if (raw.GetRootNode() < raw.GetNodeCount()){
-        modeldata.name = raw.GetNode(raw.GetRootNode()).name;
-    }else{
-        modeldata.name = raw.GetNode(raw.GetNodeCount() - 1).name;
-    }
+    modeldata.name = raw.GetNode(raw.GetNodeById(raw.GetRootNode())).name;
 }
 
 void collectVertices(SModelData &modeldata, RawModel &raw){
@@ -57,10 +53,12 @@ void collectVertices(SModelData &modeldata, RawModel &raw){
     }
 }
 
-void collectSubmeshes(SModelData &modeldata, RawModel &raw){
+void collectSubmeshes(SModelData &modeldata, RawModel &raw, RawNode &skeletonRoot, std::map<long, FbxAMatrix>& inverseBindMatricesMap){
     int trianglesCount = raw.GetTriangleCount();
 
     std::map<int, int> submeshmap;
+    skeletonRoot.isJoint = false;
+    RawSurface skeletonRawSurface;
 
     for (int i = 0; i < trianglesCount; i++){
         RawTriangle rawtriangle = raw.GetTriangle(i);
@@ -74,8 +72,17 @@ void collectSubmeshes(SModelData &modeldata, RawModel &raw){
         MeshData* meshp = &modeldata.meshes[submeshmap[rawtriangle.materialIndex]];
 
         RawMaterial rawmaterial = raw.GetMaterial(rawtriangle.materialIndex);
+        RawSurface rawsurface = raw.GetSurface(rawtriangle.surfaceIndex);
 
-        meshp->name = raw.GetSurface(rawtriangle.surfaceIndex).name;
+        if (raw.GetNode(raw.GetNodeById(rawsurface.skeletonRootId)).isJoint){
+            skeletonRoot = raw.GetNode(raw.GetNodeById(rawsurface.skeletonRootId));
+            skeletonRawSurface = rawsurface;
+        }
+
+        //meshp->name = rawsurface.name;
+        modeldata.name = rawsurface.name;
+
+        meshp->name = "";
         meshp->indices.push_back(rawtriangle.verts[0]);
         meshp->indices.push_back(rawtriangle.verts[1]);
         meshp->indices.push_back(rawtriangle.verts[2]);
@@ -102,19 +109,62 @@ void collectSubmeshes(SModelData &modeldata, RawModel &raw){
         }
         
     }
+
+    for (int i = 0; i < skeletonRawSurface.jointIds.size(); i++){
+        inverseBindMatricesMap[skeletonRawSurface.jointIds[i]] = skeletonRawSurface.inverseBindMatrices[i];
+    }
+}
+
+void collectNodesHierarchy(SModelData &modeldata, RawModel &raw, RawNode &rawnode, std::map<long, FbxAMatrix>& inverseBindMatricesMap, BoneData& boneData){
+    boneData.name = rawnode.name;
+
+    boneData.bindPosition.x = rawnode.translation[0];
+    boneData.bindPosition.y = rawnode.translation[1];
+    boneData.bindPosition.z = rawnode.translation[2];
+
+    boneData.bindRotation.w = rawnode.rotation[3];
+    boneData.bindRotation.x = rawnode.rotation[0];
+    boneData.bindRotation.y = rawnode.rotation[1];
+    boneData.bindRotation.z = rawnode.rotation[2];
+
+    boneData.bindScale.x = rawnode.scale[0];
+    boneData.bindScale.y = rawnode.scale[1];
+    boneData.bindScale.z = rawnode.scale[2];
+
+
+    if (rawnode.isJoint){
+        FbxAMatrix invBindMatrix = inverseBindMatricesMap[rawnode.id];
+        for (int i = 0; i < 4; i++){
+            for (int j = 0; j < 4; j++){
+                boneData.offsetMatrix[i][j] = invBindMatrix.Get(i, j);
+            }
+        }
+    }
+
+    for (int i = 0; i < rawnode.childIds.size(); i++){
+        BoneData boneChild;
+        collectNodesHierarchy(modeldata, raw, raw.GetNode(raw.GetNodeById(rawnode.childIds[i])), inverseBindMatricesMap, boneChild);
+        boneData.children.push_back(boneChild);
+    }
 }
 
 bool convertFbx2SModel(SModelData &modeldata, std::string path){
 
     RawModel raw;
+    RawNode skeletonRoot;
+    std::map<long, FbxAMatrix> inverseBindMatricesMap;
 
     if (!LoadFBXFile(raw, path.c_str(), "png;jpg;jpeg")){
         return false;
     }
 
-    collectName(modeldata, raw);
+    //collectName(modeldata, raw); //Getting submesh name for model
     collectVertices(modeldata, raw);
-    collectSubmeshes(modeldata, raw);
+    collectSubmeshes(modeldata, raw, skeletonRoot, inverseBindMatricesMap);
+    if (skeletonRoot.isJoint){
+        modeldata.skeleton = new BoneData;
+        collectNodesHierarchy(modeldata, raw, skeletonRoot, inverseBindMatricesMap, *modeldata.skeleton);
+    }
 
     return true;
 }
