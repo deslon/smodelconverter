@@ -61,27 +61,29 @@ int main (int argc, char *argv[]){
   return 0;
 }
 void printModel(const SModelData &modelData){
-
     printf("Model name: %s, vertices: %i, bone weights: %i\n", modelData.name.c_str(), (int)modelData.vertices.size(), (int)modelData.boneWeights.size());
 
-        for (int i = 0; i < modelData.meshes.size(); i++){
-            printf(">Mesh (%s), indices: %i\n", 
-                modelData.meshes[i].name.c_str(), 
-                (int)modelData.meshes[i].indices.size());
+    for (int i = 0; i < modelData.meshes.size(); i++){
+        printf(">Mesh (%s), indices: %i\n", 
+            modelData.meshes[i].name.c_str(), 
+            (int)modelData.meshes[i].indices.size());
 
-            if (modelData.meshes[i].materials.size() > 0){
-                printf("  >>Texture: %s\n", modelData.meshes[i].materials[0].texture.c_str());
-            }
-/*
-            for (int b = 0; b < modelData.meshes[i].bones.size(); b++){
-                printf(">>Bone (%s), weights: %i\n", 
-                    modelData.meshes[i].bones[b].name.c_str(), 
-                    (int)modelData.meshes[i].bones[b].vertexWeights.size());
-            }
-*/
+        if (modelData.meshes[i].materials.size() > 0){
+            printf("  >>Texture: %s\n", modelData.meshes[i].materials[0].texture.c_str());
         }
-    if (modelData.skeleton)
+    }
+    
+    printf("\n");
+    for (int b = 0; b < modelData.boneWeights.size(); b++){
+        printf(">>Bone Weights (%s): %i\n", 
+            modelData.boneWeights[b].name.c_str(), 
+            (int)modelData.boneWeights[b].vertexWeights.size());
+    }
+
+    if (modelData.skeleton){
+        printf("\n");
         printSkeleton(*modelData.skeleton);
+    }
 }
 
 void printSkeleton(const BoneData &bone, int layerTree){

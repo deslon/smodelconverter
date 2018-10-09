@@ -28,7 +28,6 @@ std::map<aiNode*, bool> necessaryNodes;
 bool convertAssimp2SModel(SModelData &modeldata, std::string path){
     unsigned flags =
         aiProcess_Triangulate |
-        //aiProcess_ConvertToLeftHanded |
         aiProcess_JoinIdenticalVertices |
         aiProcess_CalcTangentSpace | 
         aiProcess_FlipUVs |
@@ -69,9 +68,7 @@ bool convertAssimp2SModel(SModelData &modeldata, std::string path){
 std::string collectModelName(const aiScene *scene, aiNode *node){
 
     if (node->mNumMeshes > 0){
-
         modelRoot = node;
-
         return node->mName.C_Str();
     }
 

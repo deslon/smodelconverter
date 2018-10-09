@@ -373,7 +373,7 @@ struct RawSurface
     long                         id;
     std::string                  name;                            // The name of this surface
     long                         skeletonRootId;                  // The id of the root node of the skeleton.
-    Bounds<FbxVector4, 4>        bounds;
+    Bounds<FbxVector4, 3>        bounds;
     std::vector<long>            jointIds;
     std::vector<FbxVector4>      jointGeometryMins;
     std::vector<FbxVector4>      jointGeometryMaxs;

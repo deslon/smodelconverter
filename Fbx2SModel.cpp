@@ -10,7 +10,7 @@ void collectName(SModelData &modeldata, RawModel &raw){
     modeldata.name = raw.GetNode(raw.GetNodeById(raw.GetRootNode())).name;
 }
 
-void collectVertices(SModelData &modeldata, RawModel &raw){
+void collectVertices(SModelData &modeldata, RawModel &raw, std::map<int, std::vector<BoneVertexWeightData>>& boneWeightDataMap){
     int numVertices = raw.GetVertexCount();
     int vertexAttributes = raw.GetVertexAttributes();
 
@@ -50,10 +50,22 @@ void collectVertices(SModelData &modeldata, RawModel &raw){
             tangent.z = rawvertex.tangent[2];
             modeldata.tangents.push_back(tangent);
         }
+
+        for (int j = 0; j < 4; j++){
+            if (rawvertex.jointWeights[j] > 0){
+
+                BoneVertexWeightData boneVertexWeightData;
+                boneVertexWeightData.vertexId = i;
+                boneVertexWeightData.weight = rawvertex.jointWeights[j];
+
+                boneWeightDataMap[rawvertex.jointIndices[j]].push_back(boneVertexWeightData);
+            }
+        }
+
     }
 }
 
-void collectSubmeshes(SModelData &modeldata, RawModel &raw, RawNode &skeletonRoot, std::map<long, FbxAMatrix>& inverseBindMatricesMap){
+void collectSubmeshes(SModelData &modeldata, RawModel &raw, RawNode &skeletonRoot, std::map<long, FbxAMatrix>& inverseBindMatricesMap, std::map<int, std::vector<BoneVertexWeightData>>& boneWeightDataMap){
     int trianglesCount = raw.GetTriangleCount();
 
     std::map<int, int> submeshmap;
@@ -113,6 +125,14 @@ void collectSubmeshes(SModelData &modeldata, RawModel &raw, RawNode &skeletonRoo
     for (int i = 0; i < skeletonRawSurface.jointIds.size(); i++){
         inverseBindMatricesMap[skeletonRawSurface.jointIds[i]] = skeletonRawSurface.inverseBindMatrices[i];
     }
+
+    for ( const auto &p : boneWeightDataMap ){
+        BoneWeightData boneWeightData;
+        boneWeightData.name = raw.GetNode(raw.GetNodeById(skeletonRawSurface.jointIds[p.first])).name;
+        boneWeightData.vertexWeights = p.second;
+
+        modeldata.boneWeights.push_back(boneWeightData);
+    }
 }
 
 void collectNodesHierarchy(SModelData &modeldata, RawModel &raw, RawNode &rawnode, std::map<long, FbxAMatrix>& inverseBindMatricesMap, BoneData& boneData){
@@ -131,7 +151,6 @@ void collectNodesHierarchy(SModelData &modeldata, RawModel &raw, RawNode &rawnod
     boneData.bindScale.y = rawnode.scale[1];
     boneData.bindScale.z = rawnode.scale[2];
 
-
     if (rawnode.isJoint){
         FbxAMatrix invBindMatrix = inverseBindMatricesMap[rawnode.id];
         for (int i = 0; i < 4; i++){
@@ -139,6 +158,8 @@ void collectNodesHierarchy(SModelData &modeldata, RawModel &raw, RawNode &rawnod
                 boneData.offsetMatrix[i][j] = invBindMatrix.Get(i, j);
             }
         }
+    }else{
+        printf("Warning: node %s has a joint parent but is not a joint. Cannot get offsetMatrix (inverseBindMatrix) data.\n", rawnode.name.c_str());
     }
 
     for (int i = 0; i < rawnode.childIds.size(); i++){
@@ -153,14 +174,15 @@ bool convertFbx2SModel(SModelData &modeldata, std::string path){
     RawModel raw;
     RawNode skeletonRoot;
     std::map<long, FbxAMatrix> inverseBindMatricesMap;
+    std::map<int, std::vector<BoneVertexWeightData>> boneWeightDataMap;
 
     if (!LoadFBXFile(raw, path.c_str(), "png;jpg;jpeg")){
         return false;
     }
 
     //collectName(modeldata, raw); //Getting submesh name for model
-    collectVertices(modeldata, raw);
-    collectSubmeshes(modeldata, raw, skeletonRoot, inverseBindMatricesMap);
+    collectVertices(modeldata, raw, boneWeightDataMap);
+    collectSubmeshes(modeldata, raw, skeletonRoot, inverseBindMatricesMap, boneWeightDataMap);
     if (skeletonRoot.isJoint){
         modeldata.skeleton = new BoneData;
         collectNodesHierarchy(modeldata, raw, skeletonRoot, inverseBindMatricesMap, *modeldata.skeleton);
