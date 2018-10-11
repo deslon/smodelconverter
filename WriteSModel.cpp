@@ -80,7 +80,7 @@ void WriteSModel::writeBoneWeightDataVector(const std::vector<BoneWeightData> &v
     os->write((char*)&size, sizeof(size));
 
     for (size_t i = 0; i < size; ++i){
-        writeString(vec[i].name);
+        os->write((char*)&vec[i].boneId, sizeof(unsigned int));
         writeBoneVertexWeightDataVector(vec[i].vertexWeights);
     }
 }
@@ -110,6 +110,7 @@ void WriteSModel::writeSkeleton(const BoneData* skeleton){
 
 void WriteSModel::writeBoneData(const BoneData &boneData){
     writeString(boneData.name);
+    os->write((char*)&boneData.boneId, sizeof(unsigned int));
     os->write((char*)&boneData.bindPosition, 3 * sizeof(float));
     os->write((char*)&boneData.bindRotation, 4 * sizeof(float));
     os->write((char*)&boneData.bindScale, 3 * sizeof(float));

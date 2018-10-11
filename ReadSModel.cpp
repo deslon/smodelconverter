@@ -95,7 +95,7 @@ void ReadSModel::readBoneWeightDataVector(std::vector<BoneWeightData> &vec){
     vec.resize(size);
 
     for (size_t i = 0; i < size; ++i){
-        readString(vec[i].name);
+        is->read((char*)&vec[i].boneId, sizeof(unsigned int));
         readBoneVertexWeightDataVector(vec[i].vertexWeights);
     }
 }
@@ -125,6 +125,7 @@ void ReadSModel::readSkeleton(BoneData* &skeleton){
 
 void ReadSModel::readBoneData(BoneData &boneData){
     readString(boneData.name);
+    is->read((char*)&boneData.boneId, sizeof(unsigned int));
     is->read((char*)&boneData.bindPosition, 3 * sizeof(float));
     is->read((char*)&boneData.bindRotation, 4 * sizeof(float));
     is->read((char*)&boneData.bindScale, 3 * sizeof(float));

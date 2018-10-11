@@ -128,7 +128,7 @@ void collectSubmeshes(SModelData &modeldata, RawModel &raw, RawNode &skeletonRoo
 
     for ( const auto &p : boneWeightDataMap ){
         BoneWeightData boneWeightData;
-        boneWeightData.name = raw.GetNode(raw.GetNodeById(skeletonRawSurface.jointIds[p.first])).name;
+        boneWeightData.boneId = skeletonRawSurface.jointIds[p.first];
         boneWeightData.vertexWeights = p.second;
 
         modeldata.boneWeights.push_back(boneWeightData);
@@ -137,6 +137,7 @@ void collectSubmeshes(SModelData &modeldata, RawModel &raw, RawNode &skeletonRoo
 
 void collectNodesHierarchy(SModelData &modeldata, RawModel &raw, RawNode &rawnode, std::map<long, FbxAMatrix>& inverseBindMatricesMap, BoneData& boneData){
     boneData.name = rawnode.name;
+    boneData.boneId = rawnode.id;
 
     boneData.bindPosition.x = rawnode.translation[0];
     boneData.bindPosition.y = rawnode.translation[1];

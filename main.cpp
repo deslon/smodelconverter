@@ -14,7 +14,7 @@
 #include "ReadSModel.h"
 
 void printModel(const SModelData &modelNode);
-void printSkeleton(const BoneData &bone, int layerTree = 0);
+void printSkeleton(const BoneData &bone, std::map<unsigned int, std::string>& boneIdMap, int layerTree = 0);
 
 
 SModelData modeldata;
@@ -72,25 +72,30 @@ void printModel(const SModelData &modelData){
             printf("  >>Texture: %s\n", modelData.meshes[i].materials[0].texture.c_str());
         }
     }
-    
-    printf("\n");
-    for (int b = 0; b < modelData.boneWeights.size(); b++){
-        printf(">>Bone Weights (%s): %i\n", 
-            modelData.boneWeights[b].name.c_str(), 
-            (int)modelData.boneWeights[b].vertexWeights.size());
-    }
+
+    std::map<unsigned int, std::string> boneIdMap;
 
     if (modelData.skeleton){
         printf("\n");
-        printSkeleton(*modelData.skeleton);
+        printSkeleton(*modelData.skeleton, boneIdMap);
+    }
+
+    printf("\n");
+    for (int b = 0; b < modelData.boneWeights.size(); b++){
+        printf(">>Bone Weights (%u: %s): %i\n",
+            modelData.boneWeights[b].boneId,
+            boneIdMap[modelData.boneWeights[b].boneId].c_str(),
+            (int)modelData.boneWeights[b].vertexWeights.size());
     }
 }
 
-void printSkeleton(const BoneData &bone, int layerTree){
+void printSkeleton(const BoneData &bone, std::map<unsigned int, std::string>& boneIdMap, int layerTree){
     std::string strtree;
     for(int i = 0; i < layerTree; i++){
         strtree += "-";
     }
+    boneIdMap[bone.boneId] = bone.name;
+
     printf("%sBone name: %s\n", strtree.c_str(), bone.name.c_str());
     printf("%s  Position: %f %f %f\n", strtree.c_str(), bone.bindPosition.x, bone.bindPosition.y, bone.bindPosition.z);
     printf("%s  Rotation: %f %f %f %f\n", strtree.c_str(), bone.bindRotation.x, bone.bindRotation.y, bone.bindRotation.z, bone.bindRotation.w);
@@ -100,7 +105,7 @@ void printSkeleton(const BoneData &bone, int layerTree){
         printf("%s    %f %f %f %f\n", strtree.c_str(), bone.offsetMatrix[0][i], bone.offsetMatrix[1][i], bone.offsetMatrix[2][i], bone.offsetMatrix[3][i]);
 
     for (int i = 0; i < bone.children.size(); i++){
-        printSkeleton(bone.children[i], layerTree+1);
+        printSkeleton(bone.children[i], boneIdMap, layerTree+1);
     }
 
 }

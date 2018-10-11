@@ -25,6 +25,9 @@ aiNode* modelRoot = NULL;
 aiNode* boneRoot = NULL;
 std::map<aiNode*, bool> necessaryNodes;
 
+unsigned int boneIdSeq;
+std::map<std::string, unsigned int> boneIdMap;
+
 bool convertAssimp2SModel(SModelData &modeldata, std::string path){
     unsigned flags =
         aiProcess_Triangulate |
@@ -55,6 +58,8 @@ bool convertAssimp2SModel(SModelData &modeldata, std::string path){
 
     //directory = path.substr(0, path.find_last_of('/'));
 
+    boneIdSeq = 0;
+    boneIdMap.clear();
     sceneRoot = scene->mRootNode;
 
     modeldata.name = collectModelName(scene, sceneRoot);
@@ -183,6 +188,12 @@ BoneData* collectBones(const aiScene *scene, const aiNode *node){
         boneData->bindScale.z = aiScale.z;
 
         boneData->name = node->mName.C_Str();
+
+        if (boneIdMap.count(boneData->name) > 0){
+            boneData->boneId = boneIdMap[boneData->name];
+        }else{
+            boneData->boneId = ++boneIdSeq;
+        }
 
         float** resultOffsetMatrix = getOffsetMatrix(scene, node->mName);
         for (int i = 0; i < 4; i++){
@@ -326,7 +337,9 @@ std::vector<BoneWeightData> processBoneWeights(const aiScene *scene, const aiNod
 
         BoneWeightData boneData;
 
-        boneData.name = mesh->mBones[i]->mName.C_Str();
+        boneData.boneId = ++boneIdSeq;
+
+        boneIdMap[mesh->mBones[i]->mName.C_Str()] = boneData.boneId;
 
         for (uint j = 0 ; j < mesh->mBones[i]->mNumWeights ; j++) {
             BoneVertexWeightData vertexWeight;
