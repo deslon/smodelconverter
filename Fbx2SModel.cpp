@@ -114,7 +114,9 @@ void collectSubmeshes(SModelData &modeldata, RawModel &raw, RawNode &skeletonRoo
                     //}
                     texturedata.texture = StringUtils::GetFileNameString(StringUtils::GetCleanPathString(rawtexture.fileName));
 
-                    meshp->materials.push_back(texturedata);
+                    //TODO: Prevent creation multiple of same texture
+                    if (meshp->materials.size() == 0)
+                        meshp->materials.push_back(texturedata);
                 }
             
             }
