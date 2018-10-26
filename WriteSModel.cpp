@@ -30,16 +30,12 @@ void WriteSModel::writeUintVector(const std::vector<unsigned int> &vec){
     os->write((char*)&vec[0], vec.size() * sizeof(unsigned int));
 }
 
-void WriteSModel::writeVector3Vector(const std::vector<Vector3> &vec){
-    size_t size = vec.size();
-    os->write((char*)&size, sizeof(size));
-    os->write((char*)&vec[0], vec.size() * 3 * sizeof(float));
+void WriteSModel::writeVector3(const Vector3 &vec){
+    os->write((char*)&vec, 3 * sizeof(float));
 }
 
-void WriteSModel::writeVector2Vector(const std::vector<Vector2> &vec){
-    size_t size = vec.size();
-    os->write((char*)&size, sizeof(size));
-    os->write((char*)&vec[0], vec.size() * 2 * sizeof(float));
+void WriteSModel::writeVector2(const Vector2 &vec){
+    os->write((char*)&vec, 2 * sizeof(float));
 }
 
 void WriteSModel::writeMeshDataVector(const std::vector<MeshData> &vec){
@@ -123,15 +119,15 @@ void WriteSModel::writeVerticesVector(const std::vector<VertexData> &vec, int ve
 
 void WriteSModel::writeVertexData(const VertexData &vertexData, int vertexMask){
     if (vertexMask & VERTEX_ELEMENT_POSITION)
-        writeVector3Vector(vertexData.positions);
+        writeVector3(vertexData.position);
     if (vertexMask & VERTEX_ELEMENT_UV0)
-        writeVector2Vector(vertexData.texcoords0);
+        writeVector2(vertexData.texcoord0);
     if (vertexMask & VERTEX_ELEMENT_UV1)
-        writeVector2Vector(vertexData.texcoords1);
+        writeVector2(vertexData.texcoord1);
     if (vertexMask & VERTEX_ELEMENT_NORMAL)
-        writeVector3Vector(vertexData.normals);
+        writeVector3(vertexData.normal);
     if (vertexMask & VERTEX_ELEMENT_TANGENT)
-        writeVector3Vector(vertexData.tangents);
+        writeVector3(vertexData.tangent);
     if (vertexMask & VERTEX_ELEMENT_BITANGENT)
-        writeVector3Vector(vertexData.bitangents);
+        writeVector3(vertexData.bitangent);
 }

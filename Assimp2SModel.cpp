@@ -257,7 +257,7 @@ MeshData processMesh(SModelData &modeldata, const aiScene *scene, const aiNode* 
         vertex.x = mesh->mVertices[i].x;
         vertex.y = mesh->mVertices[i].y;
         vertex.z = mesh->mVertices[i].z;
-        vertexData.positions.push_back(vertex);
+        vertexData.position = vertex;
         
         for (unsigned uv = 0; uv < mesh->GetNumUVChannels(); uv++){
             Vector2 texcoord;
@@ -265,9 +265,9 @@ MeshData processMesh(SModelData &modeldata, const aiScene *scene, const aiNode* 
                 texcoord.x = mesh->mTextureCoords[uv][i].x; 
                 texcoord.y = mesh->mTextureCoords[uv][i].y;
                 if (uv == 0){
-                    vertexData.texcoords0.push_back(texcoord);
+                    vertexData.texcoord0 = texcoord;
                 } else if (uv == 1){
-                    vertexData.texcoords1.push_back(texcoord);
+                    vertexData.texcoord1 = texcoord;
                 }
             }
         }
@@ -282,7 +282,7 @@ MeshData processMesh(SModelData &modeldata, const aiScene *scene, const aiNode* 
             normal.y = 0.0f;
             normal.z = 0.0f;
         }
-        vertexData.normals.push_back(normal);
+        vertexData.normal = normal;
 
         Vector3 tangent;
         Vector3 bitangent;
@@ -303,8 +303,8 @@ MeshData processMesh(SModelData &modeldata, const aiScene *scene, const aiNode* 
             bitangent.y = 0.0f;
             bitangent.z = 0.0f;
         }
-        vertexData.tangents.push_back(tangent);
-        vertexData.bitangents.push_back(bitangent);
+        vertexData.tangent = tangent;
+        vertexData.bitangent = bitangent;
 
         modeldata.vertices.push_back(vertexData);
         

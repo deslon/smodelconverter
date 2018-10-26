@@ -41,28 +41,28 @@ void collectVertices(SModelData &modeldata, RawModel &raw, std::map<int, std::ve
         vertex.x = rawvertex.position[0];
         vertex.y = rawvertex.position[1];
         vertex.z = rawvertex.position[2];
-        vertexData.positions.push_back(vertex);
+        vertexData.position = vertex;
 
         if ((vertexAttributes & RAW_VERTEX_ATTRIBUTE_NORMAL) != 0) {
             Vector3 normal;
             normal.x = rawvertex.normal[0];
             normal.y = rawvertex.normal[1];
             normal.z = rawvertex.normal[2];
-            vertexData.normals.push_back(normal);
+            vertexData.normal = normal;
         }
 
         if ((vertexAttributes & RAW_VERTEX_ATTRIBUTE_UV0) != 0) {
             Vector2 uv;
             uv.x = rawvertex.uv0[0];
             uv.y = 1.0 - rawvertex.uv0[1];
-            vertexData.texcoords0.push_back(uv);
+            vertexData.texcoord0 = uv;
         }
 
         if ((vertexAttributes & RAW_VERTEX_ATTRIBUTE_UV1) != 0) {
             Vector2 uv;
             uv.x = rawvertex.uv1[0];
             uv.y = 1.0 - rawvertex.uv1[1];
-            vertexData.texcoords1.push_back(uv);
+            vertexData.texcoord1 = uv;
         }
 
         if ((vertexAttributes & RAW_VERTEX_ATTRIBUTE_TANGENT) != 0) {
@@ -70,7 +70,7 @@ void collectVertices(SModelData &modeldata, RawModel &raw, std::map<int, std::ve
             tangent.x = rawvertex.tangent[0];
             tangent.y = rawvertex.tangent[1];
             tangent.z = rawvertex.tangent[2];
-            vertexData.tangents.push_back(tangent);
+            vertexData.tangent = tangent;
         }
 
         if ((vertexAttributes & RAW_VERTEX_ATTRIBUTE_BINORMAL) != 0) {
@@ -78,7 +78,7 @@ void collectVertices(SModelData &modeldata, RawModel &raw, std::map<int, std::ve
             bitangent.x = rawvertex.binormal[0];
             bitangent.y = rawvertex.binormal[1];
             bitangent.z = rawvertex.binormal[2];
-            vertexData.bitangents.push_back(bitangent);
+            vertexData.bitangent = bitangent;
         }
 
         modeldata.vertices.push_back(vertexData);

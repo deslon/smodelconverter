@@ -67,12 +67,12 @@ struct BoneData {
 };
 
 struct VertexData {
-    std::vector<Vector3> positions;
-    std::vector<Vector2> texcoords0;
-    std::vector<Vector2> texcoords1;
-    std::vector<Vector3> normals;
-    std::vector<Vector3> tangents;
-    std::vector<Vector3> bitangents;
+    Vector3 position;
+    Vector2 texcoord0;
+    Vector2 texcoord1;
+    Vector3 normal;
+    Vector3 tangent;
+    Vector3 bitangent;
 };
 
 struct SModelData {
