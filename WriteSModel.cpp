@@ -11,11 +11,8 @@ void WriteSModel::writeModel(const SModelData &modelData){
     os->write((char*)&version, sizeof(int));
 
     writeString(modelData.name);
-    writeVector3Vector(modelData.vertices);
-    writeVector2VectorVector(modelData.texcoords);
-    writeVector3Vector(modelData.normals);
-    writeVector3Vector(modelData.tangents);
-    writeVector3Vector(modelData.bitangents);
+    os->write((char*)&modelData.vertexMask, sizeof(int));
+    writeVerticesVector(modelData.vertices, modelData.vertexMask);
     writeMeshDataVector(modelData.meshes);
     writeBoneWeightDataVector(modelData.boneWeights);
     writeSkeleton(modelData.skeleton);
@@ -43,15 +40,6 @@ void WriteSModel::writeVector2Vector(const std::vector<Vector2> &vec){
     size_t size = vec.size();
     os->write((char*)&size, sizeof(size));
     os->write((char*)&vec[0], vec.size() * 2 * sizeof(float));
-}
-
-void WriteSModel::writeVector2VectorVector(const std::vector<std::vector<Vector2>> &vec){
-    size_t size = vec.size();
-    os->write((char*)&size, sizeof(size));
-
-    for (size_t i = 0; i < size; ++i){
-        writeVector2Vector(vec[i]);
-    }
 }
 
 void WriteSModel::writeMeshDataVector(const std::vector<MeshData> &vec){
@@ -122,4 +110,28 @@ void WriteSModel::writeBoneData(const BoneData &boneData){
     for (size_t i = 0; i < size; ++i){
         writeBoneData(boneData.children[i]);
     }
+}
+
+void WriteSModel::writeVerticesVector(const std::vector<VertexData> &vec, int vertexMask){
+    size_t size = vec.size();
+    os->write((char*)&size, sizeof(size));
+
+    for (size_t i = 0; i < size; ++i){
+        writeVertexData(vec[i], vertexMask);
+    }
+}
+
+void WriteSModel::writeVertexData(const VertexData &vertexData, int vertexMask){
+    if (vertexMask & VERTEX_ELEMENT_POSITION)
+        writeVector3Vector(vertexData.positions);
+    if (vertexMask & VERTEX_ELEMENT_UV0)
+        writeVector2Vector(vertexData.texcoords0);
+    if (vertexMask & VERTEX_ELEMENT_UV1)
+        writeVector2Vector(vertexData.texcoords1);
+    if (vertexMask & VERTEX_ELEMENT_NORMAL)
+        writeVector3Vector(vertexData.normals);
+    if (vertexMask & VERTEX_ELEMENT_TANGENT)
+        writeVector3Vector(vertexData.tangents);
+    if (vertexMask & VERTEX_ELEMENT_BITANGENT)
+        writeVector3Vector(vertexData.bitangents);
 }

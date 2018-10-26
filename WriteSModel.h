@@ -15,13 +15,14 @@ private:
     void writeUintVector(const std::vector<unsigned int> &vec);
     void writeVector3Vector(const std::vector<Vector3> &vec);
     void writeVector2Vector(const std::vector<Vector2> &vec);
-    void writeVector2VectorVector(const std::vector<std::vector<Vector2>> &vec);
     void writeMeshDataVector(const std::vector<MeshData> &vec);
     void writeMaterialDataVector(const std::vector<MaterialData> &vec);
     void writeBoneWeightDataVector(const std::vector<BoneWeightData> &vec);
     void writeBoneVertexWeightDataVector(const std::vector<BoneVertexWeightData> &vec);
     void writeSkeleton(const BoneData* skeleton);
     void writeBoneData(const BoneData &boneData);
+    void writeVerticesVector(const std::vector<VertexData> &vec, int vertexMask);
+    void writeVertexData(const VertexData &vertexData, int vertexMask);
 
 public:
 

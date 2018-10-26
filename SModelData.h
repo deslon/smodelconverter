@@ -4,6 +4,19 @@
 #include <vector>
 #include <string>
 
+enum VertexElement
+{
+    VERTEX_ELEMENT_POSITION      = 1 << 0,
+    VERTEX_ELEMENT_NORMAL        = 1 << 1,
+    VERTEX_ELEMENT_TANGENT       = 1 << 2,
+    VERTEX_ELEMENT_BITANGENT     = 1 << 3,
+    VERTEX_ELEMENT_COLOR         = 1 << 4,
+    VERTEX_ELEMENT_UV0           = 1 << 5,
+    VERTEX_ELEMENT_UV1           = 1 << 6,
+    VERTEX_ELEMENT_BONE_INDICES  = 1 << 7,
+    VERTEX_ELEMENT_BONE_WEIGHTS  = 1 << 8
+};
+
 struct Quaternion {
     float w;
     float x;
@@ -53,13 +66,19 @@ struct BoneData {
     std::vector<BoneData> children;
 };
 
-struct SModelData {
-    std::string name;
-    std::vector<Vector3> vertices;
-    std::vector<std::vector<Vector2>> texcoords;
+struct VertexData {
+    std::vector<Vector3> positions;
+    std::vector<Vector2> texcoords0;
+    std::vector<Vector2> texcoords1;
     std::vector<Vector3> normals;
     std::vector<Vector3> tangents;
     std::vector<Vector3> bitangents;
+};
+
+struct SModelData {
+    std::string name;
+    int vertexMask;
+    std::vector<VertexData> vertices;
     std::vector<MeshData> meshes;
     std::vector<BoneWeightData> boneWeights;
     BoneData* skeleton;

@@ -234,28 +234,42 @@ MeshData processMesh(SModelData &modeldata, const aiScene *scene, const aiNode* 
 
     int vertexOffset = (int)modeldata.vertices.size();
 
-    modeldata.texcoords.resize(mesh->GetNumUVChannels());
+    modeldata.vertexMask |= VERTEX_ELEMENT_POSITION;
+    if (mesh->HasTextureCoords(0)){
+        modeldata.vertexMask |= VERTEX_ELEMENT_UV0;
+    }
+    if (mesh->HasTextureCoords(1)){
+        modeldata.vertexMask |= VERTEX_ELEMENT_UV1;
+    }
+    if (mesh->HasNormals()){
+        modeldata.vertexMask |= VERTEX_ELEMENT_NORMAL;
+    }
+    if (mesh->HasTangentsAndBitangents()){
+        modeldata.vertexMask |= VERTEX_ELEMENT_TANGENT;
+        modeldata.vertexMask |= VERTEX_ELEMENT_BITANGENT;
+    }
 
     for(unsigned int i = 0; i < mesh->mNumVertices; i++){
+
+        VertexData vertexData;
 
         Vector3 vertex;
         vertex.x = mesh->mVertices[i].x;
         vertex.y = mesh->mVertices[i].y;
         vertex.z = mesh->mVertices[i].z;
-        modeldata.vertices.push_back(vertex);
+        vertexData.positions.push_back(vertex);
         
         for (unsigned uv = 0; uv < mesh->GetNumUVChannels(); uv++){
-
             Vector2 texcoord;
             if(mesh->HasTextureCoords(uv)) {
                 texcoord.x = mesh->mTextureCoords[uv][i].x; 
                 texcoord.y = mesh->mTextureCoords[uv][i].y;
-            } else {
-                texcoord.x = 0.0f; 
-                texcoord.y = 0.0f;
+                if (uv == 0){
+                    vertexData.texcoords0.push_back(texcoord);
+                } else if (uv == 1){
+                    vertexData.texcoords1.push_back(texcoord);
+                }
             }
-
-            modeldata.texcoords[uv].push_back(texcoord);
         }
 
         Vector3 normal;
@@ -268,7 +282,7 @@ MeshData processMesh(SModelData &modeldata, const aiScene *scene, const aiNode* 
             normal.y = 0.0f;
             normal.z = 0.0f;
         }
-        modeldata.normals.push_back(normal);
+        vertexData.normals.push_back(normal);
 
         Vector3 tangent;
         Vector3 bitangent;
@@ -289,8 +303,10 @@ MeshData processMesh(SModelData &modeldata, const aiScene *scene, const aiNode* 
             bitangent.y = 0.0f;
             bitangent.z = 0.0f;
         }
-        modeldata.tangents.push_back(tangent);
-        modeldata.bitangents.push_back(bitangent);
+        vertexData.tangents.push_back(tangent);
+        vertexData.bitangents.push_back(bitangent);
+
+        modeldata.vertices.push_back(vertexData);
         
     }
 

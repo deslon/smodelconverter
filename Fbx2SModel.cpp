@@ -14,33 +14,55 @@ void collectVertices(SModelData &modeldata, RawModel &raw, std::map<int, std::ve
     int numVertices = raw.GetVertexCount();
     int vertexAttributes = raw.GetVertexAttributes();
 
+    modeldata.vertexMask |= VERTEX_ELEMENT_POSITION;
     if ((vertexAttributes & RAW_VERTEX_ATTRIBUTE_UV0) != 0) {
-        std::vector<Vector2> uv0vec;
-        modeldata.texcoords.push_back(uv0vec);
+        modeldata.vertexMask |= VERTEX_ELEMENT_UV0;
+    }
+    if ((vertexAttributes & RAW_VERTEX_ATTRIBUTE_UV1) != 0) {
+        modeldata.vertexMask |= VERTEX_ELEMENT_UV1;
+    }
+    if ((vertexAttributes & RAW_VERTEX_ATTRIBUTE_NORMAL) != 0) {
+        modeldata.vertexMask |= VERTEX_ELEMENT_NORMAL;
+    }
+    if ((vertexAttributes & RAW_VERTEX_ATTRIBUTE_TANGENT) != 0) {
+        modeldata.vertexMask |= VERTEX_ELEMENT_TANGENT;
+    }
+    if ((vertexAttributes & RAW_VERTEX_ATTRIBUTE_BINORMAL) != 0) {
+        modeldata.vertexMask |= VERTEX_ELEMENT_BITANGENT;
     }
 
+
     for (int i = 0; i < numVertices; i++){
+        VertexData vertexData;
+
         RawVertex rawvertex = raw.GetVertex(i);
 
         Vector3 vertex;
         vertex.x = rawvertex.position[0];
         vertex.y = rawvertex.position[1];
         vertex.z = rawvertex.position[2];
-        modeldata.vertices.push_back(vertex);
+        vertexData.positions.push_back(vertex);
 
         if ((vertexAttributes & RAW_VERTEX_ATTRIBUTE_NORMAL) != 0) {
             Vector3 normal;
             normal.x = rawvertex.normal[0];
             normal.y = rawvertex.normal[1];
             normal.z = rawvertex.normal[2];
-            modeldata.normals.push_back(normal);
+            vertexData.normals.push_back(normal);
         }
 
         if ((vertexAttributes & RAW_VERTEX_ATTRIBUTE_UV0) != 0) {
             Vector2 uv;
             uv.x = rawvertex.uv0[0];
             uv.y = 1.0 - rawvertex.uv0[1];
-            modeldata.texcoords[0].push_back(uv);
+            vertexData.texcoords0.push_back(uv);
+        }
+
+        if ((vertexAttributes & RAW_VERTEX_ATTRIBUTE_UV1) != 0) {
+            Vector2 uv;
+            uv.x = rawvertex.uv1[0];
+            uv.y = 1.0 - rawvertex.uv1[1];
+            vertexData.texcoords1.push_back(uv);
         }
 
         if ((vertexAttributes & RAW_VERTEX_ATTRIBUTE_TANGENT) != 0) {
@@ -48,8 +70,18 @@ void collectVertices(SModelData &modeldata, RawModel &raw, std::map<int, std::ve
             tangent.x = rawvertex.tangent[0];
             tangent.y = rawvertex.tangent[1];
             tangent.z = rawvertex.tangent[2];
-            modeldata.tangents.push_back(tangent);
+            vertexData.tangents.push_back(tangent);
         }
+
+        if ((vertexAttributes & RAW_VERTEX_ATTRIBUTE_BINORMAL) != 0) {
+            Vector3 bitangent;
+            bitangent.x = rawvertex.binormal[0];
+            bitangent.y = rawvertex.binormal[1];
+            bitangent.z = rawvertex.binormal[2];
+            vertexData.bitangents.push_back(bitangent);
+        }
+
+        modeldata.vertices.push_back(vertexData);
 
         for (int j = 0; j < 4; j++){
             if (rawvertex.jointWeights[j] > 0){
