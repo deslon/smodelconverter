@@ -14,7 +14,6 @@ void WriteSModel::writeModel(const SModelData &modelData){
     os->write((char*)&modelData.vertexMask, sizeof(int));
     writeVerticesVector(modelData.vertices, modelData.vertexMask);
     writeMeshDataVector(modelData.meshes);
-    writeBoneWeightDataVector(modelData.boneWeights);
     writeSkeleton(modelData.skeleton);
 }
 
@@ -28,6 +27,10 @@ void WriteSModel::writeUintVector(const std::vector<unsigned int> &vec){
     size_t size = vec.size();
     os->write((char*)&size, sizeof(size));
     os->write((char*)&vec[0], vec.size() * sizeof(unsigned int));
+}
+
+void WriteSModel::writeVector4(const Vector4 &vec){
+    os->write((char*)&vec, 4 * sizeof(float));
 }
 
 void WriteSModel::writeVector3(const Vector3 &vec){
@@ -59,26 +62,6 @@ void WriteSModel::writeMaterialDataVector(const std::vector<MaterialData> &vec){
     }
 }
 
-void WriteSModel::writeBoneWeightDataVector(const std::vector<BoneWeightData> &vec){
-    size_t size = vec.size();
-    os->write((char*)&size, sizeof(size));
-
-    for (size_t i = 0; i < size; ++i){
-        os->write((char*)&vec[i].boneId, sizeof(unsigned int));
-        writeBoneVertexWeightDataVector(vec[i].vertexWeights);
-    }
-}
-
-void WriteSModel::writeBoneVertexWeightDataVector(const std::vector<BoneVertexWeightData> &vec){
-    size_t size = vec.size();
-    os->write((char*)&size, sizeof(size));
-
-    for (size_t i = 0; i < size; ++i){
-        os->write((char*)&vec[i].vertexId, sizeof(unsigned int));
-        os->write((char*)&vec[i].weight, sizeof(float));
-    }
-}
-
 void WriteSModel::writeSkeleton(const BoneData* skeleton){
     size_t size = 0;
 
@@ -94,7 +77,7 @@ void WriteSModel::writeSkeleton(const BoneData* skeleton){
 
 void WriteSModel::writeBoneData(const BoneData &boneData){
     writeString(boneData.name);
-    os->write((char*)&boneData.boneId, sizeof(unsigned int));
+    os->write((char*)&boneData.boneIndex, sizeof(int));
     os->write((char*)&boneData.bindPosition, 3 * sizeof(float));
     os->write((char*)&boneData.bindRotation, 4 * sizeof(float));
     os->write((char*)&boneData.bindScale, 3 * sizeof(float));
@@ -130,4 +113,8 @@ void WriteSModel::writeVertexData(const VertexData &vertexData, int vertexMask){
         writeVector3(vertexData.tangent);
     if (vertexMask & VERTEX_ELEMENT_BITANGENT)
         writeVector3(vertexData.bitangent);
+    if (vertexMask & VERTEX_ELEMENT_BONE_INDICES)
+        writeVector4(vertexData.boneIndices);
+    if (vertexMask & VERTEX_ELEMENT_BONE_WEIGHTS)
+        writeVector4(vertexData.boneWeights);
 }

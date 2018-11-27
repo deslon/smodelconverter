@@ -24,6 +24,13 @@ struct Quaternion {
     float z;
 };
 
+struct Vector4 {
+    float x;
+    float y;
+    float z;
+    float w;
+};
+
 struct Vector3 {
     float x;
     float y;
@@ -40,16 +47,6 @@ struct MaterialData {
     std::string texture;
 };
 
-struct BoneVertexWeightData{
-    unsigned int vertexId;
-    float weight;
-};
-
-struct BoneWeightData {
-    unsigned int boneId;
-    std::vector<BoneVertexWeightData> vertexWeights;
-};
-
 struct MeshData {
     std::string name;
     std::vector<unsigned int> indices;
@@ -58,7 +55,7 @@ struct MeshData {
 
 struct BoneData {
     std::string name;
-    unsigned int boneId;
+    int boneIndex;
     Vector3 bindPosition;
     Quaternion bindRotation;
     Vector3 bindScale;
@@ -73,6 +70,8 @@ struct VertexData {
     Vector3 normal;
     Vector3 tangent;
     Vector3 bitangent;
+    Vector4 boneIndices;
+    Vector4 boneWeights;
 };
 
 struct SModelData {
@@ -80,7 +79,6 @@ struct SModelData {
     int vertexMask;
     std::vector<VertexData> vertices;
     std::vector<MeshData> meshes;
-    std::vector<BoneWeightData> boneWeights;
     BoneData* skeleton;
 };
 

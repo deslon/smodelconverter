@@ -11,7 +11,7 @@ std::vector<MeshData> collectModelMeshes(SModelData &modeldata, const aiScene *s
 std::string collectModelName(const aiScene *scene, aiNode *node);
 MeshData processMesh(SModelData &modeldata, const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh, const aiMaterial* material);
 BoneData* collectBones(const aiScene *scene, const aiNode *node);
-std::vector<BoneWeightData> processBoneWeights(const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh, int vertexOffset);
+void processBoneWeights(SModelData &modeldata, const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh, int vertexOffset);
 std::vector<MaterialData> processMaterials(const aiMaterial *mat, aiTextureType assimp_type, int type);
 void selectNecessaryNodes(aiNode* node, const aiNode* modelRoot);
 bool compareMeshNodeOrParent(const aiNode* node, const aiNode* modelRoot);
@@ -25,8 +25,8 @@ aiNode* modelRoot = NULL;
 aiNode* boneRoot = NULL;
 std::map<aiNode*, bool> necessaryNodes;
 
-unsigned int boneIdSeq;
-std::map<std::string, unsigned int> boneIdMap;
+unsigned int boneIndexSeq;
+std::map<std::string, unsigned int> boneIndexMap;
 
 bool convertAssimp2SModel(SModelData &modeldata, std::string path){
     unsigned flags =
@@ -58,8 +58,8 @@ bool convertAssimp2SModel(SModelData &modeldata, std::string path){
 
     //directory = path.substr(0, path.find_last_of('/'));
 
-    boneIdSeq = 0;
-    boneIdMap.clear();
+    boneIndexSeq = 0;
+    boneIndexMap.clear();
     sceneRoot = scene->mRootNode;
 
     modeldata.name = collectModelName(scene, sceneRoot);
@@ -189,10 +189,10 @@ BoneData* collectBones(const aiScene *scene, const aiNode *node){
 
         boneData->name = node->mName.C_Str();
 
-        if (boneIdMap.count(boneData->name) > 0){
-            boneData->boneId = boneIdMap[boneData->name];
+        if (boneIndexMap.count(boneData->name) > 0){
+            boneData->boneIndex = boneIndexMap[boneData->name];
         }else{
-            boneData->boneId = ++boneIdSeq;
+            boneData->boneIndex = -1;
         }
 
         float** resultOffsetMatrix = getOffsetMatrix(scene, node->mName);
@@ -247,6 +247,10 @@ MeshData processMesh(SModelData &modeldata, const aiScene *scene, const aiNode* 
     if (mesh->HasTangentsAndBitangents()){
         modeldata.vertexMask |= VERTEX_ELEMENT_TANGENT;
         modeldata.vertexMask |= VERTEX_ELEMENT_BITANGENT;
+    }
+    if (mesh->HasBones()){
+        modeldata.vertexMask |= VERTEX_ELEMENT_BONE_INDICES;
+        modeldata.vertexMask |= VERTEX_ELEMENT_BONE_WEIGHTS;
     }
 
     for(unsigned int i = 0; i < mesh->mNumVertices; i++){
@@ -310,7 +314,7 @@ MeshData processMesh(SModelData &modeldata, const aiScene *scene, const aiNode* 
         
     }
 
-    modeldata.boneWeights = processBoneWeights(scene, modelRoot, mesh, vertexOffset);
+    processBoneWeights(modeldata, scene, modelRoot, mesh, vertexOffset);
 
     //-----------SubsMesh----------------
     MeshData meshData;
@@ -343,35 +347,39 @@ MeshData processMesh(SModelData &modeldata, const aiScene *scene, const aiNode* 
     return meshData;
 }
 
-std::vector<BoneWeightData> processBoneWeights(const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh, int vertexOffset){
-
-    std::vector<BoneWeightData> bonesData;
+void processBoneWeights(SModelData &modeldata, const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh, int vertexOffset){
 
     for(unsigned int i = 0; i < mesh->mNumBones; i++){
         //printf("Bone name %s\n", mesh->mBones[i]->mName.C_Str());
         //printf("Matrix %f\n", mesh->mBones[i]->mOffsetMatrix[0][0]);
 
-        BoneWeightData boneData;
-
-        boneData.boneId = ++boneIdSeq;
-
-        boneIdMap[mesh->mBones[i]->mName.C_Str()] = boneData.boneId;
+        boneIndexMap[mesh->mBones[i]->mName.C_Str()] = boneIndexSeq;
+        boneIndexSeq++;
 
         for (uint j = 0 ; j < mesh->mBones[i]->mNumWeights ; j++) {
-            BoneVertexWeightData vertexWeight;
 
-            vertexWeight.vertexId = vertexOffset + mesh->mBones[i]->mWeights[j].mVertexId;
-            vertexWeight.weight = mesh->mBones[i]->mWeights[j].mWeight;
+            unsigned int vertexId = vertexOffset + mesh->mBones[i]->mWeights[j].mVertexId;
+            float weight = mesh->mBones[i]->mWeights[j].mWeight;
 
-            boneData.vertexWeights.push_back(vertexWeight);
+            if (modeldata.vertices[vertexId].boneWeights.x == 0) {
+                modeldata.vertices[vertexId].boneWeights.x = weight;
+                modeldata.vertices[vertexId].boneIndices.x = i;
+            }else if (modeldata.vertices[vertexId].boneWeights.y == 0) {
+                modeldata.vertices[vertexId].boneWeights.y = weight;
+                modeldata.vertices[vertexId].boneIndices.y = i;
+            }else if (modeldata.vertices[vertexId].boneWeights.z == 0) {
+                modeldata.vertices[vertexId].boneWeights.z = weight;
+                modeldata.vertices[vertexId].boneIndices.z = i;
+            }else if (modeldata.vertices[vertexId].boneWeights.w == 0) {
+                modeldata.vertices[vertexId].boneWeights.w = weight;
+                modeldata.vertices[vertexId].boneIndices.w = i;
+            }
         }
 
-        bonesData.push_back(boneData);
 
         selectNecessaryNodes(sceneRoot->FindNode(mesh->mBones[i]->mName), modelRoot);
     }
 
-    return bonesData;
 }
 
 void selectNecessaryNodes(aiNode* node, const aiNode* modelRoot){
