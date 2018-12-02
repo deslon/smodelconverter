@@ -310,6 +310,21 @@ MeshData processMesh(SModelData &modeldata, const aiScene *scene, const aiNode* 
         vertexData.tangent = tangent;
         vertexData.bitangent = bitangent;
 
+        Vector4 boneIndices;
+        boneIndices.x = 0.0f;
+        boneIndices.y = 0.0f;
+        boneIndices.z = 0.0f;
+        boneIndices.w = 0.0f;
+
+        Vector4 boneWeights;
+        boneWeights.x = 0.0f;
+        boneWeights.y = 0.0f;
+        boneWeights.z = 0.0f;
+        boneWeights.w = 0.0f;
+
+        vertexData.boneIndices = boneIndices;
+        vertexData.boneWeights = boneWeights;
+
         modeldata.vertices.push_back(vertexData);
         
     }
@@ -354,7 +369,6 @@ void processBoneWeights(SModelData &modeldata, const aiScene *scene, const aiNod
         //printf("Matrix %f\n", mesh->mBones[i]->mOffsetMatrix[0][0]);
 
         boneIndexMap[mesh->mBones[i]->mName.C_Str()] = boneIndexSeq;
-        boneIndexSeq++;
 
         for (uint j = 0 ; j < mesh->mBones[i]->mNumWeights ; j++) {
 
@@ -363,19 +377,20 @@ void processBoneWeights(SModelData &modeldata, const aiScene *scene, const aiNod
 
             if (modeldata.vertices[vertexId].boneWeights.x == 0) {
                 modeldata.vertices[vertexId].boneWeights.x = weight;
-                modeldata.vertices[vertexId].boneIndices.x = i;
+                modeldata.vertices[vertexId].boneIndices.x = boneIndexSeq;
             }else if (modeldata.vertices[vertexId].boneWeights.y == 0) {
                 modeldata.vertices[vertexId].boneWeights.y = weight;
-                modeldata.vertices[vertexId].boneIndices.y = i;
+                modeldata.vertices[vertexId].boneIndices.y = boneIndexSeq;
             }else if (modeldata.vertices[vertexId].boneWeights.z == 0) {
                 modeldata.vertices[vertexId].boneWeights.z = weight;
-                modeldata.vertices[vertexId].boneIndices.z = i;
+                modeldata.vertices[vertexId].boneIndices.z = boneIndexSeq;
             }else if (modeldata.vertices[vertexId].boneWeights.w == 0) {
                 modeldata.vertices[vertexId].boneWeights.w = weight;
-                modeldata.vertices[vertexId].boneIndices.w = i;
+                modeldata.vertices[vertexId].boneIndices.w = boneIndexSeq;
             }
         }
 
+        boneIndexSeq++;
 
         selectNecessaryNodes(sceneRoot->FindNode(mesh->mBones[i]->mName), modelRoot);
     }
