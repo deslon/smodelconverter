@@ -11,6 +11,7 @@ std::vector<MeshData> collectModelMeshes(SModelData &modeldata, const aiScene *s
 std::string collectModelName(const aiScene *scene, aiNode *node);
 MeshData processMesh(SModelData &modeldata, const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh, const aiMaterial* material);
 BoneData* collectBones(const aiScene *scene, const aiNode *node);
+void collectAnimations(const aiScene *scene, const aiNode *node);
 void processBoneWeights(SModelData &modeldata, const aiScene *scene, const aiNode* modelRoot, const aiMesh *mesh, int vertexOffset);
 std::vector<MaterialData> processMaterials(const aiMaterial *mat, aiTextureType assimp_type, int type);
 void selectNecessaryNodes(aiNode* node, const aiNode* modelRoot);
@@ -65,6 +66,7 @@ bool convertAssimp2SModel(SModelData &modeldata, std::string path){
     modeldata.name = collectModelName(scene, sceneRoot);
     modeldata.meshes = collectModelMeshes(modeldata, scene, modelRoot);
     modeldata.skeleton = collectBones(scene, boneRoot);
+    collectAnimations(scene, boneRoot);
 
     return true;
 }
@@ -214,6 +216,15 @@ BoneData* collectBones(const aiScene *scene, const aiNode *node){
 
     return NULL;
     
+}
+
+void collectAnimations(const aiScene *scene, const aiNode *node){
+    for (unsigned i = 0; i < scene->mNumAnimations; i++){
+
+        aiAnimation* anim = scene->mAnimations[i];
+
+        printf("Animation: %s %f %f\n", anim->mName.C_Str(), anim->mDuration, anim->mTicksPerSecond);
+    }
 }
 
 

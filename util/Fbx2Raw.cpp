@@ -828,7 +828,7 @@ bool LoadFBXFile(RawModel &raw, const char *fbxFileName, const char *textureExte
 
     ReadNodeHierarchy(raw, pScene, pScene->GetRootNode(), 0, "");
     ReadNodeAttributes(raw, pScene, pScene->GetRootNode(), textureLocations);
-    //ReadAnimations(raw, pScene);
+    ReadAnimations(raw, pScene);
 
     pScene->Destroy();
     pManager->Destroy();
