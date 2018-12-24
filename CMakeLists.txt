@@ -14,6 +14,8 @@ include_directories ("${PROJECT_SOURCE_DIR}/ThirdParty/assimp-4.1.0/include")
 add_subdirectory (ThirdParty/assimp-4.1.0) 
 
 include_directories ("${PROJECT_SOURCE_DIR}/ThirdParty/stb")
+include_directories ("${PROJECT_SOURCE_DIR}/ThirdParty/json")
+include_directories ("${PROJECT_SOURCE_DIR}/ThirdParty/fifo_map")
 
 # FBX
 foreach (FBXSDK_VERSION "2019.0" "2018.1.1")

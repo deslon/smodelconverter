@@ -210,22 +210,15 @@ void collectNodesHierarchy(SModelData &modeldata, RawModel &raw, RawNode &rawnod
 }
 
 void collectAnimation(SModelData &modeldata, RawModel &raw){
-
+    /*
     printf("Animation count %i\n", raw.GetAnimationCount()); 
     
     for (int i = 0; i < raw.GetAnimationCount(); i++){
         RawAnimation anim = raw.GetAnimation(i);
 
-        float sum = 0;
-
-        for (int j = 0; j < 48; j++){
-            sum += anim.times[j];
-            printf("Anim %i %f\n", j, anim.times[j]);
-        }
-
-        printf("Animation %s %i %f\n", anim.name.c_str(), (int)anim.times.size(), anim.times[25]);    
+        printf("Animation %s %i %i %i\n", anim.name.c_str(), (int)anim.times.size(), (int)anim.channels[0].weights.size(), (int)anim.channels[0].translations.size());    
     }
-    
+    */  
 }
 
 bool convertFbx2SModel(SModelData &modeldata, std::string path){

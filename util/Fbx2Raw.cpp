@@ -49,14 +49,17 @@ static bool TriangleTexturePolarity(const FbxVector2 &uv0, const FbxVector2 &uv1
 static RawMaterialType
 GetMaterialType(const RawModel &raw, const int textures[RAW_TEXTURE_USAGE_MAX], const bool vertexTransparency, const bool skinned)
 {
-    // If diffusely texture, determine material type based on texture occlusion.
-    if (textures[RAW_TEXTURE_USAGE_DIFFUSE] >= 0) {
-        switch (raw.GetTexture(textures[RAW_TEXTURE_USAGE_DIFFUSE]).occlusion) {
-            case RAW_TEXTURE_OCCLUSION_OPAQUE:
-                return skinned ? RAW_MATERIAL_TYPE_SKINNED_OPAQUE : RAW_MATERIAL_TYPE_OPAQUE;
-            case RAW_TEXTURE_OCCLUSION_TRANSPARENT:
-                return skinned ? RAW_MATERIAL_TYPE_SKINNED_TRANSPARENT : RAW_MATERIAL_TYPE_TRANSPARENT;
-        }
+    // DIFFUSE and ALBEDO are different enough to represent distinctly, but they both help determine
+    // transparency.
+    int diffuseTexture = textures[RAW_TEXTURE_USAGE_DIFFUSE];
+    if (diffuseTexture < 0) {
+        diffuseTexture = textures[RAW_TEXTURE_USAGE_ALBEDO];
+    }
+    // determine material type based on texture occlusion.
+    if (diffuseTexture >= 0) {
+        return (raw.GetTexture(diffuseTexture).occlusion == RAW_TEXTURE_OCCLUSION_OPAQUE)
+            ? (skinned ? RAW_MATERIAL_TYPE_SKINNED_OPAQUE : RAW_MATERIAL_TYPE_OPAQUE)
+            : (skinned ? RAW_MATERIAL_TYPE_SKINNED_TRANSPARENT : RAW_MATERIAL_TYPE_TRANSPARENT);
     }
 
 	// else if there is any vertex transparency, treat whole mesh as transparent
@@ -97,12 +100,12 @@ static void ReadMesh(RawModel &raw, FbxScene *pScene, FbxNode *pNode, const std:
     const FbxLayerElementAccess<FbxVector4> normalLayer(pMesh->GetElementNormal(), pMesh->GetElementNormalCount());
     const FbxLayerElementAccess<FbxVector4> binormalLayer(pMesh->GetElementBinormal(), pMesh->GetElementBinormalCount());
     const FbxLayerElementAccess<FbxVector4> tangentLayer(pMesh->GetElementTangent(), pMesh->GetElementTangentCount());
-    const FbxLayerElementAccess<FbxColor>   colorLayer(pMesh->GetElementVertexColor(), pMesh->GetElementVertexColorCount());
+    const FbxLayerElementAccess<FbxColor> colorLayer(pMesh->GetElementVertexColor(), pMesh->GetElementVertexColorCount());
     const FbxLayerElementAccess<FbxVector2> uvLayer0(pMesh->GetElementUV(0), pMesh->GetElementUVCount());
     const FbxLayerElementAccess<FbxVector2> uvLayer1(pMesh->GetElementUV(1), pMesh->GetElementUVCount());
-    const FbxSkinningAccess                 skinning(pMesh, pScene, pNode);
-    const FbxMaterialsAccess                materials(pMesh, textureLocations);
-    const FbxBlendShapesAccess              blendShapes(pMesh);
+    const FbxSkinningAccess skinning(pMesh, pScene, pNode);
+    const FbxMaterialsAccess materials(pMesh, textureLocations);
+    const FbxBlendShapesAccess blendShapes(pMesh);
 
     if (verboseOutput) {
         printf(
@@ -116,11 +119,11 @@ static void ReadMesh(RawModel &raw, FbxScene *pScene, FbxNode *pNode, const std:
     // inherited across the node hierarchy.
     // Apply the geometric transform to the mesh geometry (vertices, normal etc.) because
     // glTF does not have an equivalent to the geometric transform.
-    const FbxVector4 meshTranslation           = pNode->GetGeometricTranslation(FbxNode::eSourcePivot);
-    const FbxVector4 meshRotation              = pNode->GetGeometricRotation(FbxNode::eSourcePivot);
-    const FbxVector4 meshScaling               = pNode->GetGeometricScaling(FbxNode::eSourcePivot);
+    const FbxVector4 meshTranslation = pNode->GetGeometricTranslation(FbxNode::eSourcePivot);
+    const FbxVector4 meshRotation = pNode->GetGeometricRotation(FbxNode::eSourcePivot);
+    const FbxVector4 meshScaling = pNode->GetGeometricScaling(FbxNode::eSourcePivot);
     const FbxAMatrix meshTransform(meshTranslation, meshRotation, meshScaling);
-    const FbxMatrix  transform                 = meshTransform;
+    const FbxMatrix transform = meshTransform;
 
     // Remove translation & scaling from transforms that will bi applied to normals, tangents & binormals
     const FbxMatrix  normalTransform(FbxVector4(), meshRotation, meshScaling);
@@ -161,12 +164,13 @@ static void ReadMesh(RawModel &raw, FbxScene *pScene, FbxNode *pNode, const std:
         for (size_t targetIx = 0; targetIx < blendShapes.GetTargetShapeCount(channelIx); targetIx ++) {
             const FbxBlendShapesAccess::TargetShape &shape = blendShapes.GetTargetShape(channelIx, targetIx);
             targetShapes.push_back(&shape);
+            auto& blendChannel = blendShapes.GetBlendChannel(channelIx);
 
-            rawSurface.blendChannels.push_back(RawBlendChannel {
-                static_cast<float>(blendShapes.GetBlendChannel(channelIx).deformPercent),
-                shape.normals.LayerPresent(),
-                shape.tangents.LayerPresent(),
-            });
+            rawSurface.blendChannels.push_back(
+                RawBlendChannel { static_cast<float>(blendChannel.deformPercent),
+                        shape.normals.LayerPresent(),
+                        shape.tangents.LayerPresent(),
+                        blendChannel.name});
         }
     }
 
@@ -174,6 +178,7 @@ static void ReadMesh(RawModel &raw, FbxScene *pScene, FbxNode *pNode, const std:
     for (int polygonIndex = 0; polygonIndex < pMesh->GetPolygonCount(); polygonIndex++) {
         FBX_ASSERT(pMesh->GetPolygonSize(polygonIndex) == 3);
         const std::shared_ptr<FbxMaterialInfo> fbxMaterial = materials.GetMaterial(polygonIndex);
+        const std::vector<std::string> userProperties = materials.GetUserProperties(polygonIndex);
 
         int textures[RAW_TEXTURE_USAGE_MAX];
         std::fill_n(textures, (int) RAW_TEXTURE_USAGE_MAX, -1);
@@ -211,16 +216,15 @@ static void ReadMesh(RawModel &raw, FbxScene *pScene, FbxNode *pNode, const std:
                     RAW_SHADING_MODEL_PBR_MET_ROUGH, fbxMatInfo->colBase, fbxMatInfo->colEmissive,
                     fbxMatInfo->emissiveIntensity, fbxMatInfo->metallic, fbxMatInfo->roughness));
             } else {
-
                 FbxTraditionalMaterialInfo *fbxMatInfo = static_cast<FbxTraditionalMaterialInfo *>(fbxMaterial.get());
                 RawShadingModel shadingModel;
                 if (fbxMaterial->shadingModel == "Lambert") {
                     shadingModel = RAW_SHADING_MODEL_LAMBERT;
-                } else if (fbxMaterial->shadingModel == "Blinn") {
+                } else if (0 == fbxMaterial->shadingModel.CompareNoCase("Blinn")) {
                     shadingModel = RAW_SHADING_MODEL_BLINN;
-                } else if (fbxMaterial->shadingModel == "Phong") {
+                } else if (0 == fbxMaterial->shadingModel.CompareNoCase("Phong")) {
                     shadingModel = RAW_SHADING_MODEL_PHONG;
-                } else if (fbxMaterial->shadingModel == "Constant") {
+                } else if (0 == fbxMaterial->shadingModel.CompareNoCase("Constant")) {
                     shadingModel = RAW_SHADING_MODEL_PHONG;
                 } else {
                     shadingModel = RAW_SHADING_MODEL_UNKNOWN;
@@ -256,32 +260,33 @@ static void ReadMesh(RawModel &raw, FbxScene *pScene, FbxNode *pNode, const std:
             const FbxVector2 fbxUV1      = uvLayer1.GetElement(polygonIndex, polygonVertexIndex, controlPointIndex, FbxVector2(0.0f, 0.0f));
 
             RawVertex &vertex = rawVertices[vertexIndex];
-            vertex.position[0]   = (float) fbxPosition[0] * scaleFactor;
-            vertex.position[1]   = (float) fbxPosition[1] * scaleFactor;
-            vertex.position[2]   = (float) fbxPosition[2] * scaleFactor;
-            vertex.normal[0]     = (float) fbxNormal[0];
-            vertex.normal[1]     = (float) fbxNormal[1];
-            vertex.normal[2]     = (float) fbxNormal[2];
-            vertex.tangent[0]    = (float) fbxTangent[0];
-            vertex.tangent[1]    = (float) fbxTangent[1];
-            vertex.tangent[2]    = (float) fbxTangent[2];
-            vertex.tangent[3]    = (float) fbxTangent[3];
-            vertex.binormal[0]   = (float) fbxBinormal[0];
-            vertex.binormal[1]   = (float) fbxBinormal[1];
-            vertex.binormal[2]   = (float) fbxBinormal[2];
-            vertex.color[0]      = (float) fbxColor.mRed;
-            vertex.color[1]      = (float) fbxColor.mGreen;
-            vertex.color[2]      = (float) fbxColor.mBlue;
-            vertex.color[3]      = (float) fbxColor.mAlpha;
-            vertex.uv0[0]        = (float) fbxUV0[0];
-            vertex.uv0[1]        = (float) fbxUV0[1];
-            vertex.uv1[0]        = (float) fbxUV1[0];
-            vertex.uv1[1]        = (float) fbxUV1[1];
+            vertex.position[0] = (float) fbxPosition[0] * scaleFactor;
+            vertex.position[1] = (float) fbxPosition[1] * scaleFactor;
+            vertex.position[2] = (float) fbxPosition[2] * scaleFactor;
+            vertex.normal[0] = (float) fbxNormal[0];
+            vertex.normal[1] = (float) fbxNormal[1];
+            vertex.normal[2] = (float) fbxNormal[2];
+            vertex.tangent[0] = (float) fbxTangent[0];
+            vertex.tangent[1] = (float) fbxTangent[1];
+            vertex.tangent[2] = (float) fbxTangent[2];
+            vertex.tangent[3] = (float) fbxTangent[3];
+            vertex.binormal[0] = (float) fbxBinormal[0];
+            vertex.binormal[1] = (float) fbxBinormal[1];
+            vertex.binormal[2] = (float) fbxBinormal[2];
+            vertex.color[0] = (float) fbxColor.mRed;
+            vertex.color[1] = (float) fbxColor.mGreen;
+            vertex.color[2] = (float) fbxColor.mBlue;
+            vertex.color[3] = (float) fbxColor.mAlpha;
+            vertex.uv0[0] = (float) fbxUV0[0];
+            vertex.uv0[1] = (float) fbxUV0[1];
+            vertex.uv1[0] = (float) fbxUV1[0];
+            vertex.uv1[1] = (float) fbxUV1[1];
             vertex.jointIndices = skinning.GetVertexIndices(controlPointIndex);
             vertex.jointWeights = skinning.GetVertexWeights(controlPointIndex);
             vertex.polarityUv0  = false;
 
-            // flag this triangle as transparent if any of its corner vertices substantially deviates from fully opaque
+            // flag this triangle as transparent if any of its corner vertices substantially deviates from 
+            // fully opaque
             vertexTransparency |= colorLayer.LayerPresent() && (fabs(fbxColor.mAlpha - 1.0) > 1e-3);
 
             rawSurface.bounds.AddPoint(vertex.position);
@@ -366,25 +371,152 @@ static void ReadMesh(RawModel &raw, FbxScene *pScene, FbxNode *pNode, const std:
         }
 
         const RawMaterialType materialType = GetMaterialType(raw, textures, vertexTransparency, skinning.IsSkinned());
-        const int rawMaterialIndex = raw.AddMaterial(materialName, materialType, textures, rawMatProps);
+        const int rawMaterialIndex = raw.AddMaterial(materialName, materialType, textures, rawMatProps, userProperties);
 
         raw.AddTriangle(rawVertexIndices[0], rawVertexIndices[1], rawVertexIndices[2], rawMaterialIndex, rawSurfaceIndex);
     }
 }
 
+// ar : aspectY / aspectX
+double HFOV2VFOV(double h, double ar)
+{
+    return 2.0 * std::atan((ar)*std::tan((h * FBXSDK_PI_DIV_180) * 0.5)) * FBXSDK_180_DIV_PI;
+};
+
+// ar : aspectX / aspectY
+double VFOV2HFOV(double v, double ar)
+{
+    return 2.0 * std::atan((ar)*std::tan((v * FBXSDK_PI_DIV_180) * 0.5)) * FBXSDK_180_DIV_PI;
+}
+
+static void ReadLight(RawModel &raw, FbxScene *pScene, FbxNode *pNode)
+{
+    const FbxLight *pLight = pNode->GetLight();
+
+    int lightIx;
+    float intensity = (float)pLight->Intensity.Get();
+    FbxVector4 color = pLight->Color.Get();
+    switch (pLight->LightType.Get())
+    {
+    case FbxLight::eDirectional:
+    {
+        lightIx = raw.AddLight(pLight->GetName(), RAW_LIGHT_TYPE_DIRECTIONAL, color, intensity, 0, 0);
+        break;
+    }
+    case FbxLight::ePoint:
+    {
+        lightIx = raw.AddLight(pLight->GetName(), RAW_LIGHT_TYPE_POINT, color, intensity, 0, 0);
+        break;
+    }
+    case FbxLight::eSpot:
+    {
+        lightIx = raw.AddLight(
+            pLight->GetName(),
+            RAW_LIGHT_TYPE_SPOT,
+            color,
+            intensity,
+            (float)pLight->InnerAngle.Get(),
+            (float)pLight->OuterAngle.Get());
+        break;
+    }
+    default:
+    {
+        printf("Warning:: Ignoring unsupported light type.\n");
+        return;
+    }
+    }
+
+    int nodeId = raw.GetNodeById(pNode->GetUniqueID());
+    RawNode &node = raw.GetNode(nodeId);
+    node.lightIx = lightIx;
+}
+
+// Largely adopted from fbx example
 static void ReadCamera(RawModel &raw, FbxScene *pScene, FbxNode *pNode)
 {
     const FbxCamera *pCamera = pNode->GetCamera();
-    if (pCamera->ProjectionType.Get() == FbxCamera::EProjectionType::ePerspective) {
+
+    double filmHeight = pCamera->GetApertureHeight();
+    double filmWidth = pCamera->GetApertureWidth() * pCamera->GetSqueezeRatio();
+
+    // note Height : Width
+    double apertureRatio = filmHeight / filmWidth;
+
+    double fovx = 0.0f;
+    double fovy = 0.0f;
+
+    switch (pCamera->GetApertureMode())
+    {
+    case FbxCamera::EApertureMode::eHorizAndVert:
+    {
+        fovx = pCamera->FieldOfViewX;
+        fovy = pCamera->FieldOfViewY;
+        break;
+    }
+    case FbxCamera::EApertureMode::eHorizontal:
+    {
+        fovx = pCamera->FieldOfViewX;
+        fovy = HFOV2VFOV(fovx, apertureRatio);
+        break;
+    }
+    case FbxCamera::EApertureMode::eVertical:
+    {
+        fovy = pCamera->FieldOfViewY;
+        fovx = VFOV2HFOV(fovy, 1.0 / apertureRatio);
+        break;
+    }
+    case FbxCamera::EApertureMode::eFocalLength:
+    {
+        fovx = pCamera->ComputeFieldOfView(pCamera->FocalLength);
+        fovy = HFOV2VFOV(fovx, apertureRatio);
+        break;
+    }
+    default:
+    {
+        printf("Warning:: Unsupported ApertureMode. Setting FOV to 0.\n");
+        break;
+    }
+    }
+
+    if (pCamera->ProjectionType.Get() == FbxCamera::EProjectionType::ePerspective)
+    {
         raw.AddCameraPerspective(
-            "", pNode->GetUniqueID(), (float) pCamera->FilmAspectRatio,
-            (float) pCamera->FieldOfViewX, (float) pCamera->FieldOfViewX,
-            (float) pCamera->NearPlane, (float) pCamera->FarPlane);
-    } else {
+            "",
+            pNode->GetUniqueID(),
+            (float)pCamera->FilmAspectRatio,
+            (float)fovx,
+            (float)fovy,
+            (float)pCamera->NearPlane,
+            (float)pCamera->FarPlane);
+    }
+    else
+    {
         raw.AddCameraOrthographic(
-            "", pNode->GetUniqueID(),
-            (float) pCamera->OrthoZoom, (float) pCamera->OrthoZoom,
-            (float) pCamera->FarPlane, (float) pCamera->NearPlane);
+            "",
+            pNode->GetUniqueID(),
+            (float)pCamera->OrthoZoom,
+            (float)pCamera->OrthoZoom,
+            (float)pCamera->FarPlane,
+            (float)pCamera->NearPlane);
+    }
+
+    // Cameras in FBX coordinate space face +X when rotation is (0,0,0)
+    // We need to adjust this to face glTF specified -Z
+    auto nodeIdx = raw.GetNodeById(pNode->GetUniqueID());
+    auto &rawNode = raw.GetNode(nodeIdx);
+
+    FbxQuaternion r;
+    r.SetAxisAngle({0.0, 1.0, 0.0}, -90 * ((float)M_PI / 180.0f));
+    rawNode.rotation = rawNode.rotation * r;
+}
+
+static void ReadNodeProperty(RawModel &raw, FbxNode *pNode, FbxProperty &prop)
+{
+    int nodeId = raw.GetNodeById(pNode->GetUniqueID());
+    if (nodeId >= 0)
+    {
+        RawNode &node = raw.GetNode(nodeId);
+        node.userProperties.push_back(TranscribeProperty(prop).dump());
     }
 }
 
@@ -393,6 +525,16 @@ static void ReadNodeAttributes(
 {
     if (!pNode->GetVisibility()) {
         return;
+    }
+
+    // Only support non-animated user defined properties for now
+    FbxProperty objectProperty = pNode->GetFirstProperty();
+    while (objectProperty.IsValid()) {
+        if (objectProperty.GetFlag(FbxPropertyFlags::eUserDefined)) {
+            ReadNodeProperty(raw, pNode, objectProperty);
+        }
+
+        objectProperty = pNode->GetNextProperty(objectProperty);
     }
 
     FbxNodeAttribute *pNodeAttribute = pNode->GetNodeAttribute();
@@ -411,13 +553,15 @@ static void ReadNodeAttributes(
                 ReadCamera(raw, pScene, pNode);
                 break;
             }
+            case FbxNodeAttribute::eLight:
+                ReadLight(raw, pScene, pNode);
+                break;
             case FbxNodeAttribute::eUnknown:
             case FbxNodeAttribute::eNull:
             case FbxNodeAttribute::eMarker:
             case FbxNodeAttribute::eSkeleton:
             case FbxNodeAttribute::eCameraStereo:
             case FbxNodeAttribute::eCameraSwitcher:
-            case FbxNodeAttribute::eLight:
             case FbxNodeAttribute::eOpticalReference:
             case FbxNodeAttribute::eOpticalMarker:
             case FbxNodeAttribute::eNurbsCurve:
@@ -834,4 +978,130 @@ bool LoadFBXFile(RawModel &raw, const char *fbxFileName, const char *textureExte
     pManager->Destroy();
 
     return true;
+}
+
+// convenience method for describing a property in JSON
+json TranscribeProperty(FbxProperty &prop)
+{
+    using fbxsdk::EFbxType;
+    std::string ename;
+
+    // Convert property type
+    switch (prop.GetPropertyDataType().GetType())
+    {
+    case eFbxBool:
+        ename = "eFbxBool";
+        break;
+    case eFbxChar:
+        ename = "eFbxChar";
+        break;
+    case eFbxUChar:
+        ename = "eFbxUChar";
+        break;
+    case eFbxShort:
+        ename = "eFbxShort";
+        break;
+    case eFbxUShort:
+        ename = "eFbxUShort";
+        break;
+    case eFbxInt:
+        ename = "eFbxInt";
+        break;
+    case eFbxUInt:
+        ename = "eFbxUint";
+        break;
+    case eFbxLongLong:
+        ename = "eFbxLongLong";
+        break;
+    case eFbxULongLong:
+        ename = "eFbxULongLong";
+        break;
+    case eFbxFloat:
+        ename = "eFbxFloat";
+        break;
+    case eFbxHalfFloat:
+        ename = "eFbxHalfFloat";
+        break;
+    case eFbxDouble:
+        ename = "eFbxDouble";
+        break;
+    case eFbxDouble2:
+        ename = "eFbxDouble2";
+        break;
+    case eFbxDouble3:
+        ename = "eFbxDouble3";
+        break;
+    case eFbxDouble4:
+        ename = "eFbxDouble4";
+        break;
+    case eFbxString:
+        ename = "eFbxString";
+        break;
+
+        // Use this as fallback because it does not give very descriptive names
+    default:
+        ename = prop.GetPropertyDataType().GetName();
+        break;
+    }
+
+    json p = {{"type", ename}};
+
+    // Convert property value
+    switch (prop.GetPropertyDataType().GetType())
+    {
+    case eFbxBool:
+    case eFbxChar:
+    case eFbxUChar:
+    case eFbxShort:
+    case eFbxUShort:
+    case eFbxInt:
+    case eFbxUInt:
+    case eFbxLongLong:
+    {
+        p["value"] = prop.EvaluateValue<long long>(FBXSDK_TIME_INFINITE);
+        break;
+    }
+    case eFbxULongLong:
+    {
+        p["value"] = prop.EvaluateValue<unsigned long long>(FBXSDK_TIME_INFINITE);
+        break;
+    }
+    case eFbxFloat:
+    case eFbxHalfFloat:
+    case eFbxDouble:
+    {
+        p["value"] = prop.EvaluateValue<double>(FBXSDK_TIME_INFINITE);
+        break;
+    }
+    case eFbxDouble2:
+    {
+        auto v = prop.EvaluateValue<FbxDouble2>(FBXSDK_TIME_INFINITE);
+        p["value"] = {v[0], v[1]};
+        break;
+    }
+    case eFbxDouble3:
+    {
+        auto v = prop.EvaluateValue<FbxDouble3>(FBXSDK_TIME_INFINITE);
+        p["value"] = {v[0], v[1], v[2]};
+        break;
+    }
+    case eFbxDouble4:
+    {
+        auto v = prop.EvaluateValue<FbxDouble4>(FBXSDK_TIME_INFINITE);
+        p["value"] = {v[0], v[1], v[2], v[3]};
+        break;
+    }
+    case eFbxString:
+    {
+        p["value"] = std::string{prop.Get<FbxString>()};
+        break;
+    }
+    default:
+    {
+        p["value"] = "UNSUPPORTED_VALUE_TYPE";
+        break;
+    }
+    }
+
+    return {{prop.GetNameAsCStr(), p}};
 }

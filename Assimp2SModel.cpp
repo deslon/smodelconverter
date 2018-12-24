@@ -219,12 +219,14 @@ BoneData* collectBones(const aiScene *scene, const aiNode *node){
 }
 
 void collectAnimations(const aiScene *scene, const aiNode *node){
+    /*
     for (unsigned i = 0; i < scene->mNumAnimations; i++){
 
         aiAnimation* anim = scene->mAnimations[i];
 
         printf("Animation: %s %f %f\n", anim->mName.C_Str(), anim->mDuration, anim->mTicksPerSecond);
     }
+    */
 }
 
 

@@ -23,6 +23,14 @@
 #include <vector>
 #include <fbxsdk.h>
 
+#include <json.hpp>
+#include <fifo_map.hpp>
+
+template<class K, class V, class ignore, class A>
+using workaround_fifo_map = nlohmann::fifo_map<K, V, nlohmann::fifo_map_compare<K>, A>;
+
+using json = nlohmann::basic_json<workaround_fifo_map>;
+
 template<class T, int d>
 struct Bounds
 {
@@ -130,34 +138,30 @@ struct RawBlendVertex
     FbxVector4 tangent {};
 
     bool operator==(const RawBlendVertex &other) const {
-        return position == other.position &&
-               normal == other.normal &&
-               tangent == other.tangent;
+        return position == other.position && normal == other.normal && tangent == other.tangent;
     }
 };
 
 struct RawVertex
 {
-    RawVertex() :
-        polarityUv0(false),
-        pad1(false),
-        pad2(false),
-        pad3(false) {}
+    RawVertex() : polarityUv0(false), pad1(false), pad2(false), pad3(false) {}
 
-    FbxVector4 position;
-    FbxVector4 normal;
-    FbxVector4 binormal;
-    FbxVector4 tangent;
-    FbxVector4 color;
-    FbxVector2 uv0;
-    FbxVector2 uv1;
-    FbxVector4 jointIndices;
-    FbxVector4 jointWeights;
+    FbxVector4 position{0.0f, 0.0f, 0.0f, 0.0f};
+    FbxVector4 normal{0.0f, 0.0f, 0.0f, 0.0f};
+    FbxVector4 binormal{0.0f, 0.0f, 0.0f, 0.0f};
+    FbxVector4 tangent{0.0f, 0.0f, 0.0f, 0.0f};
+    FbxVector4 color{0.0f, 0.0f, 0.0f, 0.0f};
+    FbxVector2 uv0{0.0f, 0.0f};
+    FbxVector2 uv1{0.0f, 0.0f};
+    FbxVector4 jointIndices{0.0f, 0.0f, 0.0f, 0.0f};
+    FbxVector4 jointWeights{0.0f, 0.0f, 0.0f, 0.0f};
     // end of members that directly correspond to vertex attributes
 
-    // if this vertex participates in a blend shape setup, the surfaceIx of its dedicated mesh; otherwise, -1
+    // if this vertex participates in a blend shape setup, the surfaceIx of its dedicated mesh;
+    // otherwise, -1
     int blendSurfaceIx = -1;
-    // the size of this vector is always identical to the size of the corresponding RawSurface.blendChannels
+    // the size of this vector is always identical to the size of the corresponding
+    // RawSurface.blendChannels
     std::vector<RawBlendVertex> blends { };
 
     bool polarityUv0;
@@ -256,14 +260,14 @@ enum RawTextureOcclusion
 
 struct RawTexture
 {
-    std::string         name;           // logical name in FBX file
-    int                 width;
-    int                 height;
-    int                 mipLevels;
-    RawTextureUsage     usage;
+    std::string name; // logical name in FBX file
+    int width;
+    int height;
+    int mipLevels;
+    RawTextureUsage usage;
     RawTextureOcclusion occlusion;
-    std::string         fileName;       // original filename in FBX file
-    std::string         fileLocation;   // inferred path in local filesystem, or ""
+    std::string fileName; // original filename in FBX file
+    std::string fileLocation; // inferred path in local filesystem, or ""
 };
 
 enum RawMaterialType
@@ -280,8 +284,12 @@ struct RawMatProps {
     {}
     const RawShadingModel shadingModel;
 
-    virtual bool operator!=(const RawMatProps &other) const { return !(*this == other); }
-    virtual bool operator==(const RawMatProps &other) const { return shadingModel == other.shadingModel; };
+    virtual bool operator!=(const RawMatProps &other) const { 
+        return !(*this == other); 
+    }
+    virtual bool operator==(const RawMatProps &other) const { 
+        return shadingModel == other.shadingModel; 
+    };
 };
 
 struct RawTraditionalMatProps : RawMatProps {
@@ -355,10 +363,26 @@ struct RawMetRoughMatProps : RawMatProps {
 
 struct RawMaterial
 {
-    std::string                  name;
-    RawMaterialType              type;
+    std::string name;
+    RawMaterialType type;
     std::shared_ptr<RawMatProps> info;
-    int                          textures[RAW_TEXTURE_USAGE_MAX];
+    int textures[RAW_TEXTURE_USAGE_MAX];
+    std::vector<std::string> userProperties;
+};
+
+enum RawLightType {
+    RAW_LIGHT_TYPE_DIRECTIONAL,
+    RAW_LIGHT_TYPE_POINT,
+    RAW_LIGHT_TYPE_SPOT,
+};
+
+struct RawLight {
+    std::string name;
+    RawLightType type;
+    FbxVector4 color;
+    float intensity;
+    float innerConeAngle; // only meaningful for spot
+    float outerConeAngle; // only meaningful for spot
 };
 
 struct RawBlendChannel
@@ -366,25 +390,26 @@ struct RawBlendChannel
     float defaultDeform;
     bool hasNormals;
     bool hasTangents;
+    std::string name;
 };
 
 struct RawSurface
 {
-    long                         id;
-    std::string                  name;                            // The name of this surface
-    long                         skeletonRootId;                  // The id of the root node of the skeleton.
-    Bounds<FbxVector4, 3>        bounds;
-    std::vector<long>            jointIds;
-    std::vector<FbxVector4>      jointGeometryMins;
-    std::vector<FbxVector4>      jointGeometryMaxs;
-    std::vector<FbxAMatrix>      inverseBindMatrices;
+    long id;
+    std::string name; // The name of this surface
+    long skeletonRootId;  // The id of the root node of the skeleton.
+    Bounds<FbxVector4, 3> bounds;
+    std::vector<long> jointIds;
+    std::vector<FbxVector4> jointGeometryMins;
+    std::vector<FbxVector4> jointGeometryMaxs;
+    std::vector<FbxAMatrix> inverseBindMatrices;
     std::vector<RawBlendChannel> blendChannels;
-    bool                         discrete;
+    bool discrete;
 };
 
 struct RawChannel
 {
-    int                nodeIndex;
+    int nodeIndex;
     std::vector<FbxVector4> translations;
     std::vector<FbxQuaternion> rotations;
     std::vector<FbxVector4> scales;
@@ -393,15 +418,15 @@ struct RawChannel
 
 struct RawAnimation
 {
-    std::string             name;
-    std::vector<float>      times;
+    std::string name;
+    std::vector<float> times;
     std::vector<RawChannel> channels;
 };
 
 struct RawCamera
 {
     std::string name;
-    long        nodeId;
+    long nodeId;
 
     enum
     {
@@ -429,15 +454,17 @@ struct RawCamera
 
 struct RawNode
 {
-    bool                     isJoint;
-    long                     id;
-    std::string              name;
-    long                     parentId;
-    std::vector<long>        childIds;
-    FbxVector4               translation;
-    FbxQuaternion            rotation;
-    FbxVector4               scale;
-    long                     surfaceId;
+    bool isJoint;
+    long  id;
+    std::string name;
+    long parentId;
+    std::vector<long> childIds;
+    FbxVector4 translation;
+    FbxQuaternion rotation;
+    FbxVector4 scale;
+    long surfaceId;
+    long lightIx;
+    std::vector<std::string> userProperties;
 };
 
 class RawModel
@@ -453,15 +480,18 @@ public:
     int AddMaterial(const RawMaterial &material);
     int AddMaterial(
         const char *name, const RawMaterialType materialType, const int textures[RAW_TEXTURE_USAGE_MAX],
-        std::shared_ptr<RawMatProps> materialInfo);
+        std::shared_ptr<RawMatProps> materialInfo, const std::vector<std::string>& userProperties);
+    int AddLight(
+        const char* name, RawLightType lightType, FbxVector4 color,
+        float intensity, float innerConeAngle, float outerConeAngle);
     int AddSurface(const RawSurface &suface);
     int AddSurface(const char *name, long surfaceId);
     int AddAnimation(const RawAnimation &animation);
     int AddCameraPerspective(
         const char *name, const long nodeId, const float aspectRatio, const float fovDegreesX, const float fovDegreesY,
         const float nearZ, const float farZ);
-    int
-    AddCameraOrthographic(const char *name, const long nodeId, const float magX, const float magY, const float nearZ, const float farZ);
+    int AddCameraOrthographic(
+        const char *name, const long nodeId, const float magX, const float magY, const float nearZ, const float farZ);
     int AddNode(const RawNode &node);
     int AddNode(const long id, const char *name, const long parentId);
     void SetRootNode(const long nodeId) { rootNodeId = nodeId; }
@@ -509,6 +539,10 @@ public:
     int GetCameraCount() const { return (int) cameras.size(); }
     const RawCamera &GetCamera(const int index) const { return cameras[index]; }
 
+    // Iterate over the lights.
+    int GetLightCount() const { return (int)lights.size(); }
+    const RawLight& GetLight(const int index) const { return lights[index]; }
+
     // Iterate over the nodes.
     int GetNodeCount() const { return (int) nodes.size(); }
     const RawNode &GetNode(const int index) const { return nodes[index]; }
@@ -529,17 +563,18 @@ public:
 private:
     FbxVector4 getFaceNormal(int verts[3]) const;
 
-    long                                             rootNodeId;
-    int                                              vertexAttributes;
+    long rootNodeId;
+    int vertexAttributes;
     std::unordered_map<RawVertex, int, VertexHasher> vertexHash;
-    std::vector<RawVertex>                           vertices;
-    std::vector<RawTriangle>                         triangles;
-    std::vector<RawTexture>                          textures;
-    std::vector<RawMaterial>                         materials;
-    std::vector<RawSurface>                          surfaces;
-    std::vector<RawAnimation>                        animations;
-    std::vector<RawCamera>                           cameras;
-    std::vector<RawNode>                             nodes;
+    std::vector<RawVertex> vertices;
+    std::vector<RawTriangle> triangles;
+    std::vector<RawTexture> textures;
+    std::vector<RawMaterial> materials;
+    std::vector<RawLight> lights;
+    std::vector<RawSurface> surfaces;
+    std::vector<RawAnimation> animations;
+    std::vector<RawCamera> cameras;
+    std::vector<RawNode> nodes;
 };
 
 template<typename _attrib_type_>

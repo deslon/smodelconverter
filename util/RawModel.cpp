@@ -102,14 +102,14 @@ int RawModel::AddTexture(const std::string &name, const std::string &fileName, c
         properties = ImageUtils::GetImageProperties(!fileLocation.empty() ? fileLocation.c_str() : fileName.c_str());
 
     RawTexture texture;
-    texture.name         = name;
-    texture.width        = properties.width;
-    texture.height       = properties.height;
-    texture.mipLevels    = (int) ceilf(log2f(std::max((float) properties.width, (float) properties.height)));
-    texture.usage        = usage;
-    texture.occlusion    = (properties.occlusion == ImageUtils::IMAGE_TRANSPARENT) ?
-                           RAW_TEXTURE_OCCLUSION_TRANSPARENT : RAW_TEXTURE_OCCLUSION_OPAQUE;
-    texture.fileName     = fileName;
+    texture.name = name;
+    texture.width = properties.width;
+    texture.height = properties.height;
+    texture.mipLevels = (int) ceilf(log2f(std::max((float) properties.width, (float) properties.height)));
+    texture.usage = usage;
+    texture.occlusion = (properties.occlusion == ImageUtils::IMAGE_TRANSPARENT) ?
+                        RAW_TEXTURE_OCCLUSION_TRANSPARENT : RAW_TEXTURE_OCCLUSION_OPAQUE;
+    texture.fileName = fileName;
     texture.fileLocation = fileLocation;
     textures.emplace_back(texture);
     return (int) textures.size() - 1;
@@ -117,14 +117,15 @@ int RawModel::AddTexture(const std::string &name, const std::string &fileName, c
 
 int RawModel::AddMaterial(const RawMaterial &material)
 {
-    return AddMaterial(material.name.c_str(), material.type, material.textures, material.info);
+    return AddMaterial(material.name.c_str(), material.type, material.textures, material.info,  material.userProperties);
 }
 
 int RawModel::AddMaterial(
     const char *name,
     const RawMaterialType materialType,
     const int textures[RAW_TEXTURE_USAGE_MAX],
-    std::shared_ptr<RawMatProps> materialInfo)
+    std::shared_ptr<RawMatProps> materialInfo,
+    const std::vector<std::string>& userProperties)
 {
     for (size_t i = 0; i < materials.size(); i++) {
         if (materials[i].name != name) {
@@ -139,6 +140,13 @@ int RawModel::AddMaterial(
         bool match = true;
         for (int j = 0; match && j < RAW_TEXTURE_USAGE_MAX; j++) {
             match = match && (materials[i].textures[j] == textures[j]);
+        }
+        if (materials[i].userProperties.size() != userProperties.size()) {
+            match = false;
+        } else {
+            for (int j = 0; match && j < userProperties.size(); j++) {
+                match = match && (materials[i].userProperties[j] == userProperties[j]);
+            }
         }
         if (match) {
             return (int) i;
@@ -157,6 +165,39 @@ int RawModel::AddMaterial(
     materials.emplace_back(material);
 
     return (int) materials.size() - 1;
+}
+
+int RawModel::AddLight(
+    const char* name,
+    const RawLightType lightType,
+    const FbxVector4 color,
+    const float intensity,
+    const float innerConeAngle,
+    const float outerConeAngle) 
+{
+    for (size_t i = 0; i < lights.size(); i++) {
+        if (lights[i].name != name || lights[i].type != lightType) {
+            continue;
+        }
+        // only care about cone angles for spot
+        if (lights[i].type == RAW_LIGHT_TYPE_SPOT) {
+            if (lights[i].innerConeAngle != innerConeAngle ||
+                    lights[i].outerConeAngle != outerConeAngle) {
+                continue;
+            }
+        }
+        return (int)i;
+    }
+    RawLight light{
+        name,
+        lightType,
+        color,
+        intensity,
+        innerConeAngle,
+        outerConeAngle,
+    };
+    lights.push_back(light);
+    return (int)lights.size() - 1;
 }
 
 int RawModel::AddSurface(const RawSurface &surface)
@@ -209,18 +250,18 @@ int RawModel::AddNode(const RawNode &node)
 }
 
 int RawModel::AddCameraPerspective(
-    const char *name, const long nodeId, const float aspectRatio, const float fovDegreesX, const float fovDegreesY, const float nearZ,
-    const float farZ)
+    const char *name, const long nodeId, const float aspectRatio, 
+    const float fovDegreesX, const float fovDegreesY, const float nearZ, const float farZ)
 {
     RawCamera camera;
-    camera.name                    = name;
-    camera.nodeId                  = nodeId;
-    camera.mode                    = RawCamera::CAMERA_MODE_PERSPECTIVE;
+    camera.name = name;
+    camera.nodeId = nodeId;
+    camera.mode  = RawCamera::CAMERA_MODE_PERSPECTIVE;
     camera.perspective.aspectRatio = aspectRatio;
     camera.perspective.fovDegreesX = fovDegreesX;
     camera.perspective.fovDegreesY = fovDegreesY;
-    camera.perspective.nearZ       = nearZ;
-    camera.perspective.farZ        = farZ;
+    camera.perspective.nearZ = nearZ;
+    camera.perspective.farZ = farZ;
     cameras.emplace_back(camera);
     return (int) cameras.size() - 1;
 }
@@ -229,13 +270,13 @@ int RawModel::AddCameraOrthographic(
     const char *name, const long nodeId, const float magX, const float magY, const float nearZ, const float farZ)
 {
     RawCamera camera;
-    camera.name               = name;
-    camera.nodeId             = nodeId;
-    camera.mode               = RawCamera::CAMERA_MODE_ORTHOGRAPHIC;
-    camera.orthographic.magX  = magX;
-    camera.orthographic.magY  = magY;
+    camera.name = name;
+    camera.nodeId = nodeId;
+    camera.mode = RawCamera::CAMERA_MODE_ORTHOGRAPHIC;
+    camera.orthographic.magX = magX;
+    camera.orthographic.magY = magY;
     camera.orthographic.nearZ = nearZ;
-    camera.orthographic.farZ  = farZ;
+    camera.orthographic.farZ = farZ;
     cameras.emplace_back(camera);
     return (int) cameras.size() - 1;
 }
@@ -251,14 +292,14 @@ int RawModel::AddNode(const long id, const char *name, const long parentId)
     }
 
     RawNode joint;
-    joint.isJoint     = false;
-    joint.id          = id;
-    joint.name        = name;
-    joint.parentId    = parentId;
-    joint.surfaceId   = 0;
+    joint.isJoint = false;
+    joint.id  = id;
+    joint.name = name;
+    joint.parentId = parentId;
+    joint.surfaceId = 0;
     joint.translation = FbxVector4(0, 0, 0, 1);
-    joint.rotation    = FbxQuaternion(0, 0, 0, 1);
-    joint.scale       = FbxVector4(1, 1, 1, 1);
+    joint.rotation = FbxQuaternion(0, 0, 0, 1);
+    joint.scale = FbxVector4(1, 1, 1, 1);
 
     nodes.emplace_back(joint);
     return (int) nodes.size() - 1;
@@ -475,7 +516,6 @@ void RawModel::CreateMaterialModels(
     // Create a separate model for each material.
     RawModel *model;
     for (size_t i = 0; i < sortedTriangles.size(); i++) {
-
         if (sortedTriangles[i].materialIndex < 0 || sortedTriangles[i].surfaceIndex < 0) {
             continue;
         }
@@ -643,7 +683,7 @@ size_t RawModel::CalculateNormals(bool onlyBroken)
         if (vertex.normal.SquareLength() < FLT_MIN) {
             vertex.normal = vertex.position - averagePos;
             if (vertex.normal.SquareLength() < FLT_MIN) {
-                vertex.normal = FbxVector4( 0.0f, 1.0f, 0.0f, 1.0f );
+                vertex.normal = FbxVector4(0.0f, 1.0f, 0.0f, 1.0f);
                 continue;
             }
         }

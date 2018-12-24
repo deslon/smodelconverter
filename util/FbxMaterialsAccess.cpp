@@ -8,6 +8,7 @@
  */
 
 #include "FbxMaterialsAccess.hpp"
+#include "Fbx2Raw.hpp"
 
 FbxMaterialsAccess::FbxMaterialsAccess(const FbxMesh *pMesh, const std::map<const FbxTexture *, FbxString> &textureLocations) :
     mappingMode(FbxGeometryElement::eNone),
@@ -37,6 +38,10 @@ FbxMaterialsAccess::FbxMaterialsAccess(const FbxMesh *pMesh, const std::map<cons
         if (materialNum < 0) {
             continue;
         }
+
+        FbxSurfaceMaterial* surfaceMaterial =
+            mesh->GetNode()->GetSrcObject<FbxSurfaceMaterial>(materialNum);
+
         if (materialNum >= summaries.size()) {
             summaries.resize(materialNum + 1);
         }
@@ -45,6 +50,19 @@ FbxMaterialsAccess::FbxMaterialsAccess(const FbxMesh *pMesh, const std::map<cons
             summary = summaries[materialNum] = GetMaterialInfo(
                 mesh->GetNode()->GetSrcObject<FbxSurfaceMaterial>(materialNum),
                 textureLocations);
+        }
+
+        if (materialNum >= userProperties.size()) {
+            userProperties.resize(materialNum + 1);
+        }
+        if (userProperties[materialNum].empty()) {
+            FbxProperty objectProperty = surfaceMaterial->GetFirstProperty();
+            while (objectProperty.IsValid()) {
+                if (objectProperty.GetFlag(FbxPropertyFlags::eUserDefined)) {
+                    userProperties[materialNum].push_back(TranscribeProperty(objectProperty).dump());
+                }
+                objectProperty = surfaceMaterial->GetNextProperty(objectProperty);
+            }
         }
     }
 }
@@ -61,8 +79,22 @@ const std::shared_ptr<FbxMaterialInfo> FbxMaterialsAccess::GetMaterial(const int
     return nullptr;
 }
 
-std::unique_ptr<FbxMaterialInfo>
-FbxMaterialsAccess::GetMaterialInfo(FbxSurfaceMaterial *material, const std::map<const FbxTexture *, FbxString> &textureLocations)
+const std::vector<std::string> FbxMaterialsAccess::GetUserProperties(const int polygonIndex) const 
+{
+    if (mappingMode != FbxGeometryElement::eNone) {
+        const int materialNum =
+            indices->GetAt((mappingMode == FbxGeometryElement::eByPolygon) ? polygonIndex : 0);
+        if (materialNum < 0) {
+            return std::vector<std::string>();
+        }
+        return userProperties.at((unsigned long)materialNum);
+    }
+    return std::vector<std::string>();
+}
+
+std::unique_ptr<FbxMaterialInfo> FbxMaterialsAccess::GetMaterialInfo(
+    FbxSurfaceMaterial *material, 
+    const std::map<const FbxTexture *, FbxString> &textureLocations)
 {
     std::unique_ptr<FbxMaterialInfo> res;
     res = FbxRoughMetMaterialInfo::From(material, textureLocations);
